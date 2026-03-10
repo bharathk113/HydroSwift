@@ -20,62 +20,93 @@ def run_plot_only(args) -> int:
 
     from plot_station_timeseries import plot_station
 
-    basin_dir = Path(args.output_dir) / args.basin.lower()
+    # ---------------------------------------------------------
+    # WRIS basin directory
+    # ---------------------------------------------------------
 
-    if not basin_dir.exists():
-        print(f"No SWIFT output found for basin: {args.basin}")
-        return 1
+    basin_dir = None
+    if args.basin:
+        basin_dir = Path(args.output_dir) / args.basin.lower()
+
+    # ---------------------------------------------------------
+    # CWC directory
+    # ---------------------------------------------------------
+
+    cwc_dir = Path(args.output_dir) / "cwc" / "stations"
 
     selected_variables = [
         folder_name for key, (_, folder_name) in DATASETS.items()
         if getattr(args, key)
     ]
 
+    print("\nPlot-only mode enabled.")
+
+    total_plots = 0
+
     # ---------------------------------------------------------
-    # Plot entire basin
+    # CWC plotting
     # ---------------------------------------------------------
 
-    if not selected_variables:
+    if args.cwc:
 
-        print("\nPlot-only mode enabled.")
-        print("Scanning basin folder:", basin_dir)
-
-        files = _collect_files(basin_dir)
-
-        if not files:
-            print("No station files found.")
+        if not cwc_dir.exists():
+            print("No CWC output found.")
             return 1
 
-        print("Stations found:", len(files))
+        files = _collect_files(cwc_dir)
+
+        if not files:
+            print("No CWC station files found.")
+            return 1
+
+        print("\nScanning CWC stations:", len(files))
 
         for file in files:
             plot_station(file)
+            total_plots += 1
 
+        print("\nPlots generated:", total_plots)
         return 0
 
     # ---------------------------------------------------------
-    # Plot selected datasets only
+    # WRIS plotting
     # ---------------------------------------------------------
 
-    print("\nPlot-only mode enabled.")
+    if basin_dir and basin_dir.exists():
 
-    for variable in selected_variables:
+        if not selected_variables:
 
-        variable_dir = basin_dir / variable
+            files = _collect_files(basin_dir)
 
-        if not os.path.exists(variable_dir):
-            print(f"No data found for: {variable}")
-            continue
+            if files:
+                print("Scanning WRIS basin folder:", basin_dir)
+                print("Stations found:", len(files))
 
-        files = _collect_files(variable_dir)
+                for file in files:
+                    plot_station(file)
+                    total_plots += 1
 
-        if not files:
-            print(f"No station files found for: {variable}")
-            continue
+        else:
 
-        print(f"Plotting {variable} ({len(files)} stations)")
+            for variable in selected_variables:
 
-        for file in files:
-            plot_station(file)
+                variable_dir = basin_dir / variable
+
+                if not variable_dir.exists():
+                    continue
+
+                files = _collect_files(variable_dir)
+
+                print(f"Plotting {variable} ({len(files)} stations)")
+
+                for file in files:
+                    plot_station(file)
+                    total_plots += 1
+
+    if total_plots == 0:
+        print("No station files found.")
+        return 1
+
+    print("\nPlots generated:", total_plots)
 
     return 0

@@ -72,33 +72,118 @@ Science runs on coffee ☕
 
 
 def main() -> int:
-    """CLI main function."""
+    """Main SWIFT execution entry point."""
+
+    from .cli import build_parser, DATASETS
+    from .plot import run_plot_only
+    from .download import run_download
+    from .cwc import run_cwc_download
+
     parser = build_parser()
     args = parser.parse_args()
 
+    # ---------------------------------------------------------
+    # Coffee ☕
+    # ---------------------------------------------------------
+
     if args.coffee:
-        _print_coffee()
+        print("Buy the developer a coffee ☕")
+        print("UPI: carbform@upi\n")
+        return 0
+
+    # ---------------------------------------------------------
+    # Station listing mode
+    # ---------------------------------------------------------
+
+    if args.stations:
+
+        from .api import WRISAPI
+
+        api = WRISAPI()
+
+        print("\nAvailable basins:\n")
+
+        basins = api.get_basin_list()
+
+        for basin in basins:
+            print(basin)
+
+        return 0
+
+    # ---------------------------------------------------------
+    # Plot-only mode
+    # ---------------------------------------------------------
 
     if args.plot_only:
         return run_plot_only(args)
 
+    # ---------------------------------------------------------
+    # Dataset compatibility check
+    # ---------------------------------------------------------
+
+    if args.cwc:
+
+        unsupported = []
+
+        if args.q:
+            unsupported.append("discharge")
+
+        if args.rf:
+            unsupported.append("rainfall")
+
+        if args.temp:
+            unsupported.append("temperature")
+
+        if args.rh:
+            unsupported.append("humidity")
+
+        if args.solar:
+            unsupported.append("solar radiation")
+
+        if args.sed:
+            unsupported.append("sediment")
+
+        if args.gwl:
+            unsupported.append("groundwater")
+
+        if args.atm:
+            unsupported.append("atmospheric pressure")
+
+        if unsupported:
+
+            print("\nWARNING:")
+            print("CWC API only supports water level data.")
+            print("Ignoring unsupported datasets:", ", ".join(unsupported))
+            print()
+
+    # ---------------------------------------------------------
+    # CWC mode
+    # ---------------------------------------------------------
+
+    if args.cwc or args.cwc_station:
+        return run_cwc_download(args)
+    # ---------------------------------------------------------
+    # Default WRIS download
+    # ---------------------------------------------------------
+
+    if not args.basin:
+        raise SystemExit("Error: basin required unless using --cwc")
+
+    client = WrisClient(delay=args.delay)
+
+    if not client.check_api():
+        raise SystemExit(1)
+
+    basin_code = client.get_basin_code(args.basin)
+
     selected = selected_datasets(args)
+
     if not selected:
         raise SystemExit("No dataset selected")
 
-    client = WrisClient(delay=args.delay)
-    if not client.check_api():
-        return 1
+    return run_download(args, selected, client, basin_code)
 
-    basin_code = client.get_basin_code(args.basin)
-    result = run_download(args=args, selected=selected, client=client, basin_code=basin_code)
 
-    print("\nDone!")
-    print(f"Downloaded Data for {args.start_date} → {args.end_date}")
-    print("Total stations downloaded:", result["downloaded_count"])
-    print("Files saved in:", result["base_output"])
-    print(time.strftime("%Y-%m-%d %H:%M:%S"))
-    return 0
 
 
 if __name__ == "__main__":

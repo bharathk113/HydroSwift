@@ -11,6 +11,5 @@ dependencies = [
     "tqdm",
     "openpyxl"
 ]
-
 [project.scripts]
 swift = "swift_app.main:main"

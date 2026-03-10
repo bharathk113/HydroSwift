@@ -37,11 +37,11 @@ def build_parser() -> argparse.ArgumentParser:
     required.add_argument(
         "-b",
         "--basin",
-        required=True,
         help="River basin name (example: Krishna, Godavari)",
     )
 
-    datasets = parser.add_argument_group("Datasets")
+    datasets = parser.add_argument_group(
+    "Datasets (WRIS or CWC depending on --cwc)")
     datasets.add_argument("-q", action="store_true", help="River discharge")
     datasets.add_argument("-wl", action="store_true", help="River water level")
     datasets.add_argument("-atm", action="store_true", help="Atmospheric pressure")
@@ -51,10 +51,20 @@ def build_parser() -> argparse.ArgumentParser:
     datasets.add_argument("-solar", action="store_true", help="Solar radiation")
     datasets.add_argument("-sed", action="store_true", help="Suspended sediment")
     datasets.add_argument("-gwl", action="store_true", help="Groundwater level")
-
     download = parser.add_argument_group("Download behaviour")
     download.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing files"
+    )
+    parser.add_argument(
+    "--cwc",
+    action="store_true",
+    help="Download CWC real-time gauge data for all stations",
+    )
+
+    parser.add_argument(
+    "--cwc-station",
+    nargs="+",
+    help="Download CWC data for specific station codes",
     )
     download.add_argument(
         "--delay",

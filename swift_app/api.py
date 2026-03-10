@@ -9,7 +9,7 @@ import requests
 import urllib3
 
 urllib3.disable_warnings()
-ssl._create_default_https_context = ssl._create_unverified_context
+
 
 BASE = "https://indiawris.gov.in"
 
@@ -22,11 +22,11 @@ TS_API = BASE + "/CommonDataSetMasterAPI/getCommonDataSetByStationCode"
 BASIN_API = BASE + "/basin/getMasterBasin"
 
 HEADERS = {
-    "accept": "application/json, text/plain, */*",
-    "content-type": "application/json",
-    "origin": BASE,
-    "referer": BASE + "/dataSet/",
-    "user-agent": "Mozilla/5.0",
+    "Accept": "application/json, text/plain, */*",
+    "Content-Type": "application/json",
+    "Origin": "https://indiawris.gov.in",
+    "Referer": "https://indiawris.gov.in/wris/",
+    "User-Agent": "Mozilla/5.0",
 }
 
 
@@ -36,47 +36,73 @@ class WrisClient:
     def __init__(self, delay: float = 0.25):
         self.delay = delay
         self.session = requests.Session()
+        # WRIS uses a broken SSL chain, so we disable verification
         self.session.verify = False
+        # suppress SSL warnings
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json"
+        })
 
     def post(self, url: str, payload: dict, retries: int = 3):
-        """POST helper with retry and soft failure handling."""
+        """POST helper with retry and better diagnostics."""
         for _ in range(retries):
             try:
                 response = self.session.post(
-                    url, json=payload, headers=HEADERS, timeout=60
+                    url,
+                    json=payload,
+                    headers=HEADERS,
+                    timeout=60,
+                    verify=False,
                 )
+
                 if response.status_code == 200:
+                    data = response.json()
                     time.sleep(self.delay)
-                    return response.json()
-            except Exception:
-                pass
+                    return data
+
+                else:
+                    print("WRIS API returned:", response.status_code)
+                    print(response.text[:300])
+
+            except Exception as e:
+                print("Request failed:", str(e))
+
             time.sleep(2)
+
         return None
 
     def check_api(self) -> bool:
-        """Check WRIS root endpoint availability."""
-        try:
-            response = self.session.get(BASE, timeout=10)
-            if response.status_code != 200:
-                print("\nERROR: WRIS server responded but returned an unexpected status.")
-                print("Please try again later.")
-                return False
-            return True
-        except requests.exceptions.ProxyError:
-            print("\nERROR: Unable to connect to WRIS API (proxy error).")
-            print("Check your proxy / VPN configuration.")
-            return False
-        except requests.exceptions.ConnectionError:
-            print("\nERROR: Unable to reach WRIS API.")
-            print("Check your internet connection.")
-            return False
-        except requests.exceptions.Timeout:
-            print("\nERROR: WRIS server timed out.")
-            print("Try again later.")
-            return False
-        except Exception:
-            print("\nERROR: Unexpected network error while contacting WRIS.")
-            return False
+        """Check WRIS availability (handles broken SSL chain)."""
+
+        urls = [
+            "https://indiawris.gov.in/wris",
+            "https://indiawris.gov.in"
+        ]
+
+        for url in urls:
+            try:
+                response = self.session.get(
+                    url,
+                    timeout=10,
+                    verify=False,      # WRIS SSL chain is broken
+                    allow_redirects=True
+                )
+
+                print(f"Testing WRIS endpoint: {url}")
+                print("Status:", response.status_code)
+
+                if response.status_code < 400:
+                    return True
+
+            except Exception as e:
+                print("Request failed:", str(e))
+
+        print("\nERROR: Unable to reach WRIS API.")
+        print("WRIS may be down or the endpoint may have changed.")
+        return False
 
     def get_basin_code(self, basin_name: str) -> str:
         """Resolve basin name to basin code."""
@@ -140,7 +166,7 @@ class WrisClient:
                 "tributaryid": str(tributary_id),
                 "agencyid": str(agency_id),
                 "datasetcode": dataset_code,
-                "telemetric": False,
+                "telemetric": "false",
             },
         )
         if manual and manual.get("data"):

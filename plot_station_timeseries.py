@@ -4,17 +4,17 @@
 Generate hydrographs from SWIFT output.
 
 Supports:
-• single station
-• variable folder
-• basin folder
+• WRIS datasets
+• CWC gauge datasets
+• CSV and XLSX files
 
 Examples
 --------
 
 Single station
-python plot_station_timeseries.py output/krishna/discharge/station.xlsx
+python plot_station_timeseries.py output/krishna/discharge/station.csv
 
-All discharge stations
+All stations in folder
 python plot_station_timeseries.py output/krishna/discharge/
 
 Entire basin
@@ -26,34 +26,49 @@ import importlib
 import pandas as pd
 
 matplotlib = importlib.import_module("matplotlib")
-
-# use non-GUI backend
 matplotlib.use("Agg")
 
 plt = importlib.import_module("matplotlib.pyplot")
 mdates = importlib.import_module("matplotlib.dates")
+
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 
 # ============================================================
-# Load SWIFT Excel robustly
+# Load SWIFT file robustly
 # ============================================================
 
 def load_swift_file(file_path):
 
-    if str(file_path).endswith(".csv"):
+    file_path = str(file_path)
+
+    if file_path.endswith(".csv"):
         df = pd.read_csv(file_path)
-    else:
+
+    elif file_path.endswith(".xlsx"):
         df = pd.read_excel(file_path)
 
+    else:
+        return None
+
     df.columns = [str(c).strip().lower() for c in df.columns]
+
+    # ------------------------------------------------
+    # Normalize column names
+    # ------------------------------------------------
+
+    if "wse" in df.columns and "value" not in df.columns:
+        df["value"] = df["wse"]
 
     # WRIS sometimes shifts header row
     if "time" not in df.columns or "value" not in df.columns:
 
-        df = pd.read_excel(file_path, header=1)
-        df.columns = [str(c).strip().lower() for c in df.columns]
+        try:
+            df = pd.read_excel(file_path, header=1)
+            df.columns = [str(c).strip().lower() for c in df.columns]
+        except Exception:
+            return None
 
         if "time" not in df.columns or "value" not in df.columns:
             return None
@@ -73,48 +88,60 @@ def plot_station(file_path):
 
     try:
 
-        variable = file_path.parent.name
-        basin = file_path.parent.parent.name
-
-        df = load_swift_excel(file_path)
+        df = load_swift_file(file_path)
 
         if df is None:
             print("Skipping (missing columns):", file_path.name)
             return
 
-        # parse timestamps
         df["time"] = pd.to_datetime(df["time"], errors="coerce")
 
         df = df.dropna(subset=["time", "value"])
-
-        # remove duplicates
         df = df.drop_duplicates(subset="time")
-
-        # critical: sort chronologically
         df = df.sort_values("time")
 
         if df.empty:
             print("Skipping (no data):", file_path.name)
             return
 
-        # -------------------------
-        # Determine label
-        # -------------------------
+        # ----------------------------------------------------
+        # Determine dataset type
+        # ----------------------------------------------------
 
-        if variable == "discharge":
-            ylabel = "Discharge (m³/s)"
+        parts = file_path.parts
 
-        elif variable == "water_level":
-            ylabel = "Water Level"
+        if "cwc" in parts:
+
+            dataset = "cwc"
+            ylabel = "Water Level (m)"
+
+            out_dir = Path("images") / "cwc"
+            prefix = "CWC_"
 
         else:
-            ylabel = df["unit"].iloc[0] if "unit" in df.columns else "Value"
 
-        # -------------------------
-        # Hydrograph plot
-        # -------------------------
+            dataset = "wris"
 
-        fig, ax = plt.subplots(figsize=(12,4.5))
+            variable = file_path.parent.name
+            basin = file_path.parent.parent.name
+
+            if variable == "discharge":
+                ylabel = "Discharge (m³/s)"
+
+            elif variable == "water_level":
+                ylabel = "Water Level (m)"
+
+            else:
+                ylabel = df["unit"].iloc[0] if "unit" in df.columns else "Value"
+
+            out_dir = Path("images") / "wris" / basin / variable
+            prefix = ""
+
+        # ----------------------------------------------------
+        # Plot hydrograph
+        # ----------------------------------------------------
+
+        fig, ax = plt.subplots(figsize=(12, 4.5))
 
         ax.plot(
             df["time"],
@@ -126,7 +153,9 @@ def plot_station(file_path):
         ax.set_xlabel("Year")
         ax.set_ylabel(ylabel)
 
-        ax.set_title(file_path.stem.replace("_"," "))
+        title = file_path.stem.replace("_", " ")
+
+        ax.set_title(title)
 
         ax.grid(
             True,
@@ -138,7 +167,6 @@ def plot_station(file_path):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-        # year ticks
         ax.xaxis.set_major_locator(mdates.YearLocator(5))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
 
@@ -146,22 +174,22 @@ def plot_station(file_path):
 
         fig.tight_layout()
 
-        # -------------------------
-        # Output directory
-        # -------------------------
+        # ----------------------------------------------------
+        # Output
+        # ----------------------------------------------------
 
-        out_dir = Path("images") / basin / variable
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        out_file = out_dir / (file_path.stem + ".png")
+        out_file = out_dir / f"{prefix}{file_path.stem}.png"
 
-        fig.savefig(str(out_file), dpi=300)
+        fig.savefig(out_file, dpi=300)
 
         plt.close(fig)
 
         print("Saved:", out_file)
 
     except Exception as e:
+
         print("Failed:", file_path.name, "|", str(e))
 
 
@@ -176,7 +204,10 @@ def collect_files(input_path):
     if input_path.is_file():
         return [input_path]
 
-    return list(input_path.rglob("*.xlsx"))
+    files = list(input_path.rglob("*.csv"))
+    files.extend(input_path.rglob("*.xlsx"))
+
+    return files
 
 
 # ============================================================
