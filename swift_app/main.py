@@ -68,7 +68,6 @@ def main() -> int:
         _print_coffee()
         print("Many kinds of monkeys have a strong taste for tea, coffee and spirituous liqueurs.")
         print("— Charles Darwin")
-        print("The Descent of Man (1871), Vol. 1, 12.\n")
 
     # ---------------------------------------------------------
     # External List Mode
