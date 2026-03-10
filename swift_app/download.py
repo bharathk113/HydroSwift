@@ -17,9 +17,12 @@ except Exception:
         return iterable
 
 
-def _save_timeseries(args, base_output, folder, meta, station, dataset, df):
+def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_col):
+    """Standardize columns and save station timeseries file."""
 
     station_name = str(meta.get("station_Name", "unknown")).replace("/", "-")
+    lat = meta.get("latitude", "")
+    lon = meta.get("longitude", "")
 
     ext = args.format
     filename = f"{station}_{station_name}_{dataset}.{ext}"
@@ -29,15 +32,28 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df):
     if os.path.exists(output_path) and not args.overwrite:
         return None
 
+    # Standardize columns
+    df = df.copy()
+    df["station_code"] = station
+    df["time"] = pd.to_datetime(df["time"], errors="coerce")
+    df = df.dropna(subset=["time"])
+
+    if "value" in df.columns:
+        df.rename(columns={"value": var_col}, inplace=True)
+
+    df["lat"] = lat
+    df["lon"] = lon
+
+    # Keep only standardized columns
+    out_cols = ["station_code", "time", var_col, "unit", "lat", "lon"]
+    out_cols = [c for c in out_cols if c in df.columns]
+    df = df[out_cols]
+
     if args.format == "csv":
         df.to_csv(output_path, index=False)
 
     elif args.format == "xlsx":
         df.to_excel(output_path, index=False)
-
-    if args.plot:
-        from plot_station_timeseries import plot_station
-        plot_station(output_path)
 
     return output_path
 
@@ -52,7 +68,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
     downloaded: list[str] = []
     lock = Lock()
 
-    def worker(station_code: str, dataset_code: str, folder: str):
+    def worker(station_code: str, dataset_code: str, folder: str, var_col: str):
 
         meta = client.get_metadata(station_code, dataset_code)
         if not meta:
@@ -75,6 +91,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             station=station_code,
             dataset=dataset_code,
             df=frame,
+            var_col=var_col,
         )
 
         if saved_file:
@@ -83,6 +100,9 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
                 downloaded.append(station_code)
 
     for dataset_code, folder in selected.items():
+
+        from .cli import DATASET_COLUMNS
+        var_col = DATASET_COLUMNS.get(dataset_code, "value")
 
         print(f"\nDataset: {folder}")
 
@@ -138,11 +158,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
 
         print("Stations discovered:", n_stations)
 
-        if args.stations:
 
-            pd.DataFrame({"station": station_list}).to_csv(
-                os.path.join(base_output, "stations.csv"), index=False
-            )
 
         os.makedirs(os.path.join(base_output, folder), exist_ok=True)
 
@@ -151,7 +167,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
 
             futures = [
-                executor.submit(worker, station_code, dataset_code, folder)
+                executor.submit(worker, station_code, dataset_code, folder, var_col)
                 for station_code in station_list
             ]
 
@@ -163,10 +179,6 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             ):
                 future.result()
 
-        # ---------------------------------------------------------
-        # Optional merge
-        # ---------------------------------------------------------
-
         if args.merge:
 
             pattern = "*.csv" if args.format == "csv" else "*.xlsx"
@@ -175,32 +187,63 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
 
             if files:
 
-                frames = [
-                    pd.read_csv(f) if f.endswith(".csv") else pd.read_excel(f)
-                    for f in files
-                ]
+                try:
+                    gpd_mod = importlib.import_module("geopandas")
 
-                merged = pd.concat(frames, ignore_index=True)
+                    frames = [
+                        pd.read_csv(f) if f.endswith(".csv") else pd.read_excel(f)
+                        for f in files
+                    ]
 
-                merged.to_parquet(
-                    os.path.join(base_output, f"{args.basin}_{folder}.parquet")
-                )
+                    merged = pd.concat(frames, ignore_index=True)
+
+                    # Convert lat/lon to numeric for geometry
+                    merged["lat"] = pd.to_numeric(merged["lat"], errors="coerce")
+                    merged["lon"] = pd.to_numeric(merged["lon"], errors="coerce")
+
+                    has_coords = merged["lat"].notna() & merged["lon"].notna()
+
+                    if has_coords.any():
+                        gdf = gpd_mod.GeoDataFrame(
+                            merged[has_coords],
+                            geometry=gpd_mod.points_from_xy(
+                                merged.loc[has_coords, "lon"],
+                                merged.loc[has_coords, "lat"]
+                            ),
+                            crs="EPSG:4326",
+                        )
+
+                        gpkg_path = os.path.join(
+                            base_output, f"{args.basin}_{folder}.gpkg"
+                        )
+
+                        gdf.to_file(gpkg_path, layer=folder, driver="GPKG")
+                        print(f"Saved GeoPackage: {gpkg_path} ({len(gdf)} rows)")
+
+                    else:
+                        print("No coordinates found — skipping GeoPackage")
+
+                except Exception as e:
+                    print(f"GeoPackage merge failed: {e}")
 
     # ---------------------------------------------------------
-    # Plotting (identical behaviour to CWC)
+    # Plotting
     # ---------------------------------------------------------
 
     if args.plot:
 
         try:
 
-            from plot_station_timeseries import plot_station
+            from plot_station_timeseries import plot_station  # noqa: top-level script
             from pathlib import Path
 
             print("\nGenerating hydrographs...")
 
             files = list(Path(base_output).rglob("*.csv"))
             files.extend(Path(base_output).rglob("*.xlsx"))
+
+            # Exclude metadata files from plotting
+            files = [f for f in files if "metadata" not in f.name]
 
             if not files:
                 print("No station files found for plotting")
@@ -247,31 +290,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             index=False
         )
 
-    # ---------------------------------------------------------
-    # GeoPackage export
-    # ---------------------------------------------------------
+    print(f"\nDownload complete. Files saved to: {base_output}")
+    print(f"Stations downloaded: {len(downloaded)}")
 
-    if args.geopackage and metadata_records:
-
-        gpd = importlib.import_module("geopandas")
-
-        metadata_df = pd.DataFrame(metadata_records)
-
-        gdf = gpd.GeoDataFrame(
-            metadata_df,
-            geometry=gpd.points_from_xy(
-                metadata_df["longitude"],
-                metadata_df["latitude"]
-            ),
-            crs="EPSG:4326",
-        )
-
-        gdf.to_file(
-            os.path.join(base_output, "stations.gpkg"),
-            driver="GPKG"
-        )
-
-    return {
-        "base_output": base_output,
-        "downloaded_count": len(downloaded),
-    }
+    return 0

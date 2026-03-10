@@ -212,10 +212,11 @@ def download_station(station, output_dir, args):
     # ---------------------------------------------------------
 
     df["station_name"] = name
+    df["unit"] = "m"
     df["lat"] = lat
     df["lon"] = lon
 
-    cols = ["station_code", "station_name", "time", "wse", "lat", "lon"]
+    cols = ["station_code", "time", "wse", "unit", "lat", "lon"]
     df = df[[c for c in cols if c in df.columns]]
 
     # ---------------------------------------------------------
@@ -352,23 +353,19 @@ def run_cwc_download(args):
         except Exception as e:
             print("Plotting failed:", str(e))
 
-    # ---------------------------------------------------------
-    # GeoPackage export
-    # ---------------------------------------------------------
-
-    if args.geopackage:
+    if args.merge:
 
         try:
 
             import geopandas as gpd
 
-            print("\nBuilding GeoPackage layers...")
+            print("\nMerging CWC stations into GeoPackage...")
 
             files = list(Path(base_output).glob("*.csv"))
             files.extend(Path(base_output).glob("*.xlsx"))
 
             if not files:
-                print("No station files found for GeoPackage export")
+                print("No station files found for merging")
 
             else:
 
@@ -383,62 +380,57 @@ def run_cwc_download(args):
                         else:
                             df = pd.read_excel(f)
 
+                        # Only merge files that have lat/lon for geometry
                         if {"lat", "lon"}.issubset(df.columns):
-
-                            frames.append(
-                                df[
-                                    [
-                                        "station_code",
-                                        "station_name",
-                                        "time",
-                                        "wse",
-                                        "lat",
-                                        "lon"
-                                    ]
-                                ]
-                            )
+                            frames.append(df)
 
                     except Exception:
                         continue
 
                 if frames:
 
-                    data = pd.concat(frames)
+                    data = pd.concat(frames, ignore_index=True)
 
                     data["time"] = pd.to_datetime(
                         data["time"],
                         errors="coerce"
                     )
 
-                    gdf = gpd.GeoDataFrame(
-                        data,
-                        geometry=gpd.points_from_xy(
-                            data.lon,
-                            data.lat
-                        ),
-                        crs="EPSG:4326"
-                    )
+                    data["lat"] = pd.to_numeric(data["lat"], errors="coerce")
+                    data["lon"] = pd.to_numeric(data["lon"], errors="coerce")
 
-                    gpkg_path = os.path.join(
-                        args.output_dir,
-                        "cwc",
-                        "timeseries.gpkg"
-                    )
+                    has_coords = data["lat"].notna() & data["lon"].notna()
 
-                    gdf.to_file(
-                        gpkg_path,
-                        layer="cwc_timeseries",
-                        driver="GPKG"
-                    )
+                    if has_coords.any():
 
-                    print("Saved time-series GeoPackage:", gpkg_path)
-                    print("Total observations:", len(gdf))
+                        gdf = gpd.GeoDataFrame(
+                            data[has_coords],
+                            geometry=gpd.points_from_xy(
+                                data.loc[has_coords, "lon"],
+                                data.loc[has_coords, "lat"]
+                            ),
+                            crs="EPSG:4326"
+                        )
 
-                else:
-                    print("No coordinates found in station files — skipping geopackage")
+                        gpkg_path = os.path.join(
+                            args.output_dir,
+                            "cwc",
+                            "cwc_timeseries.gpkg"
+                        )
+
+                        gdf.to_file(
+                            gpkg_path,
+                            layer="cwc_timeseries",
+                            driver="GPKG"
+                        )
+
+                        print(f"Saved merged GeoPackage: {gpkg_path} ({len(gdf)} rows)")
+
+                    else:
+                        print("No valid coordinates found — skipping GeoPackage merge")
 
         except Exception as e:
-            print("GeoPackage export failed:", str(e))
+            print("GeoPackage merge failed:", str(e))
 
     # ---------------------------------------------------------
     # Final summary

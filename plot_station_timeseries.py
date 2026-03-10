@@ -58,8 +58,11 @@ def load_swift_file(file_path):
     # Normalize column names
     # ------------------------------------------------
 
-    if "wse" in df.columns and "value" not in df.columns:
-        df["value"] = df["wse"]
+    known_vars = ["wse", "q", "wl", "atm", "rf", "temp", "rh", "solar", "sed", "gwl"]
+    for var in known_vars:
+        if var in df.columns and "value" not in df.columns:
+            df["value"] = df[var]
+            break
 
     # WRIS sometimes shifts header row
     if "time" not in df.columns or "value" not in df.columns:

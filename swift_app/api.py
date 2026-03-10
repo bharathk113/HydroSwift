@@ -38,9 +38,6 @@ class WrisClient:
         self.session = requests.Session()
         # WRIS uses a broken SSL chain, so we disable verification
         self.session.verify = False
-        # suppress SSL warnings
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json"
@@ -165,6 +162,7 @@ class WrisClient:
             {
                 "tributaryid": str(tributary_id),
                 "agencyid": str(agency_id),
+                "localriverid": localriver_id,
                 "datasetcode": dataset_code,
                 "telemetric": "false",
             },

@@ -39,3 +39,4 @@ data/
 .ipynb_checkpoints
 
 .DS_Store
+\n# Test outputs\ntest_output*/\n*.gpkg\n

@@ -20,6 +20,39 @@ DATASETS = OrderedDict(
     }
 )
 
+WRIS_BASINS = OrderedDict({
+    "1": "Brahmani and Baitarni",
+    "2": "Cauvery",
+    "3": "East flowing rivers between Mahanadi and Pennar",
+    "4": "East flowing rivers between Pennar and Kanyakumari",
+    "5": "Godavari",
+    "6": "Krishna",
+    "7": "Mahanadi",
+    "8": "Mahi",
+    "9": "Minor rivers draining into Myanmar and Bangladesh",
+    "10": "Narmada",
+    "11": "Pennar",
+    "12": "Sabarmati",
+    "13": "Subernarekha",
+    "14": "Tapi",
+    "15": "West flowing rivers from Tadri to Kanyakumari",
+    "16": "West flowing rivers from Tapi to Tadri",
+    "17": "West flowing rivers of Kutch and Saurashtra including Luni"
+})
+
+# Map dataset codes to short column names for the value column
+DATASET_COLUMNS = {
+    "DISCHARG": "q",
+    "WATERLVL": "wl",
+    "PRESS": "atm",
+    "RAINF": "rf",
+    "MT_TEMP": "temp",
+    "HUMID": "rh",
+    "SOLAR_RD": "solar",
+    "SEDIM": "sed",
+    "GWATERLVL": "gwl",
+}
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build argument parser for SWIFT CLI."""
@@ -33,11 +66,15 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
+    basin_help = "River basin name or corresponding number:\n"
+    for num, name in WRIS_BASINS.items():
+        basin_help += f"  [{num}] {name}\n"
+
     required = parser.add_argument_group("Required arguments")
     required.add_argument(
         "-b",
         "--basin",
-        help="River basin name (example: Krishna, Godavari)",
+        help=basin_help,
     )
 
     datasets = parser.add_argument_group(
@@ -64,7 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
     "--cwc-station",
     nargs="+",
-    help="Download CWC data for specific station codes",
+    help="Download CWC data for specific station codes (see --list for details)",
     )
     download.add_argument(
         "--delay",
@@ -73,7 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Delay between API requests (default: 0.25 seconds)",
     )
     download.add_argument(
-        "--merge", action="store_true", help="Merge all station files into one dataset"
+        "--merge", action="store_true", help="Merge all station files into a GeoPackage"
     )
     download.add_argument(
         "--start-date",
@@ -90,16 +127,11 @@ def build_parser() -> argparse.ArgumentParser:
     output.add_argument(
         "--metadata", action="store_true", help="Save station metadata as CSV"
     )
-    output.add_argument(
-        "--geopackage", action="store_true", help="Export station locations as GeoPackage"
-    )
+
     output.add_argument(
         "--plot",
         action="store_true",
         help="Generate station time series plots after download",
-    )
-    output.add_argument(
-        "--stations", action="store_true", help="Export discovered station list"
     )
     output.add_argument(
         "--output-dir", default="output", help="Custom output directory (default: output)"
@@ -112,6 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     misc = parser.add_argument_group("Misc")
+    misc.add_argument("--list", action="store_true", help="List available WRIS basins and CWC station info")
     misc.add_argument("--coffee", action="store_true", help="Take a virtual coffee break ☕")
     misc.add_argument(
         "--plot-only",

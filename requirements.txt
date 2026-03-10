@@ -1,5 +1,7 @@
 requests
 pandas
 tqdm
+openpyxl
+matplotlib
 geopandas
 shapely

@@ -1,6 +1,6 @@
 [project]
 name = "swift-wris"
-version = "0.4.0"
+version = "0.4.1"
 description = "Simple WRIS India Fetch Tool"
 authors = [{name="Carbform"}]
 requires-python = ">=3.9"
@@ -9,7 +9,14 @@ dependencies = [
     "requests",
     "pandas",
     "tqdm",
-    "openpyxl"
+    "openpyxl",
+    "matplotlib"
 ]
+
+[project.optional-dependencies]
+geo = ["geopandas", "shapely"]
+rich = ["rich"]
+all = ["geopandas", "shapely", "rich"]
+
 [project.scripts]
 swift = "swift_app.main:main"

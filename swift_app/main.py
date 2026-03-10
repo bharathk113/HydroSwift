@@ -2,7 +2,7 @@
 SWIFT — Main CLI Entrypoint (Modular Core)
 -------------------------------------------
 
-Version: 0.4.0 — Delta Delhi
+Version: 0.4.1 — Delta Delhi
 
 Author
 ------
@@ -32,41 +32,18 @@ from __future__ import annotations
 
 import time
 
-from .api import WrisClient
-from .banner import print_wish_banner
-from .cli import build_parser, selected_datasets
-from .download import run_download
-from .plot import run_plot_only
-
-
-# ============================================================
-# SWIFT Version Information (core entrypoint metadata)
-# ============================================================
-
-APP_NAME = "SWIFT — Simple WRIS India Fetch Tool"
-APP_ORG = "Carbform • carbform.github.io"
-
-VERSION_MAJOR = 0
-VERSION_MINOR = 4
-VERSION_PATCH = 0
-
-VERSION_CODENAME = "Delta Delhi"
-
-VERSION = f"{VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_PATCH}"
-VERSION_FULL = f"{VERSION} — {VERSION_CODENAME}"
-
 
 def _print_coffee() -> None:
     print(
         r"""
-       ( (
-        ) )
-      ........
-      |      |]
-      \      /
-       `----'
-
-Science runs on coffee ☕
+      ( (
+       ) )
+    ........
+    |      |]
+    \      /
+     `----'
+     TIME FOR A COFFEE BREAK
+     Your request is running in the background...
 """
     )
 
@@ -74,7 +51,8 @@ Science runs on coffee ☕
 def main() -> int:
     """Main SWIFT execution entry point."""
 
-    from .cli import build_parser, DATASETS
+    from .cli import build_parser, DATASETS, selected_datasets
+    from .api import WrisClient
     from .plot import run_plot_only
     from .download import run_download
     from .cwc import run_cwc_download
@@ -87,28 +65,38 @@ def main() -> int:
     # ---------------------------------------------------------
 
     if args.coffee:
-        print("Buy the developer a coffee ☕")
-        print("UPI: carbform@upi\n")
+        _print_coffee()
+        print("Many kinds of monkeys have a strong taste for tea, coffee and spirituous liqueurs.")
+        print("— Charles Darwin")
+        print("The Descent of Man (1871), Vol. 1, 12.\n")
+
+    # ---------------------------------------------------------
+    # External List Mode
+    # ---------------------------------------------------------
+
+    if args.list:
+        from .cli import WRIS_BASINS
+        print("\nAvailable WRIS Basins:")
+        for num, name in WRIS_BASINS.items():
+            print(f"  [{num}] {name}")
+        
+        print("\nAvailable CWC Stations:")
+        print("  The CWC dataset covers over 1,500 individual stations.")
+        print("  To view the full catalog of station codes and names, please check the local file:")
+        print("  →  swift_app/cwc_stations.csv")
+        print("\n  If you are browsing the repository, you can find it here:")
+        print("  →  https://github.com/carbform/swift/blob/dev/swift_app/cwc_stations.csv\n")
+        
         return 0
 
     # ---------------------------------------------------------
-    # Station listing mode
+    # Parse numbered basin input (WRIS only)
     # ---------------------------------------------------------
-
-    if args.stations:
-
-        from .api import WRISAPI
-
-        api = WRISAPI()
-
-        print("\nAvailable basins:\n")
-
-        basins = api.get_basin_list()
-
-        for basin in basins:
-            print(basin)
-
-        return 0
+    
+    if args.basin:
+        from .cli import WRIS_BASINS
+        if args.basin in WRIS_BASINS:
+            args.basin = WRIS_BASINS[args.basin]
 
     # ---------------------------------------------------------
     # Plot-only mode

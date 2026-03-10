@@ -3,6 +3,6 @@ title: "SWIFT — Simple WRIS India Fetch Tool"
 message: "If you use SWIFT in your research, please cite it."
 authors:
   - name: C.Sarat
-version: 0.4.0
+version: 0.4.1
 date-released: 2026-03-09
 url: https://github.com/carbform/swift
