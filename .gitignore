@@ -1,0 +1,41 @@
+__pycache__/
+*.pyc
+*.pyo
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# SWIFT outputs
+output/
+images/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints*.pyd
+
+.env
+.venv
+
+output/
+data/
+
+*.xlsx
+*.parquet
+
+.ipynb_checkpoints
+
+.DS_Store

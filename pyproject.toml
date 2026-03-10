@@ -1,0 +1,16 @@
+[project]
+name = "swift-wris"
+version = "0.4.0"
+description = "Simple WRIS India Fetch Tool"
+authors = [{name="Carbform"}]
+requires-python = ">=3.9"
+
+dependencies = [
+    "requests",
+    "pandas",
+    "tqdm",
+    "openpyxl"
+]
+
+[project.scripts]
+swift = "swift_app.main:main"
