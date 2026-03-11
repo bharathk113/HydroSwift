@@ -39,6 +39,10 @@ def run_plot_only(args) -> int:
         if getattr(args, key)
     ]
 
+    # Ignore WRIS dataset flags when plotting CWC data
+    if args.cwc:
+        selected_variables = []
+
     print("\nPlot-only mode enabled.")
 
     total_plots = 0

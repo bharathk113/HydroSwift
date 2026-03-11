@@ -293,7 +293,7 @@ def run_cwc_download(args):
 
     downloaded = 0
     skipped = 0
-    workers = 4
+    workers = min(8, (os.cpu_count() or 1) * 2)
 
     # ---------------------------------------------------------
     # Parallel downloads
@@ -333,7 +333,7 @@ def run_cwc_download(args):
 
         try:
 
-            from plot_station_timeseries import plot_station
+            from plot_station_timeseries import plot_station  # noqa: external script
 
             print("\nGenerating hydrographs...")
 
@@ -353,84 +353,19 @@ def run_cwc_download(args):
         except Exception as e:
             print("Plotting failed:", str(e))
 
+    from .merge import merge_dataset_folder
+
     if args.merge:
 
-        try:
+        dataset_dir = base_output
 
-            import geopandas as gpd
+        gpkg_path = os.path.join(
+            args.output_dir,
+            "cwc",
+            "cwc_timeseries.gpkg"
+        )
 
-            print("\nMerging CWC stations into GeoPackage...")
-
-            files = list(Path(base_output).glob("*.csv"))
-            files.extend(Path(base_output).glob("*.xlsx"))
-
-            if not files:
-                print("No station files found for merging")
-
-            else:
-
-                frames = []
-
-                for f in files:
-
-                    try:
-
-                        if f.suffix == ".csv":
-                            df = pd.read_csv(f)
-                        else:
-                            df = pd.read_excel(f)
-
-                        # Only merge files that have lat/lon for geometry
-                        if {"lat", "lon"}.issubset(df.columns):
-                            frames.append(df)
-
-                    except Exception:
-                        continue
-
-                if frames:
-
-                    data = pd.concat(frames, ignore_index=True)
-
-                    data["time"] = pd.to_datetime(
-                        data["time"],
-                        errors="coerce"
-                    )
-
-                    data["lat"] = pd.to_numeric(data["lat"], errors="coerce")
-                    data["lon"] = pd.to_numeric(data["lon"], errors="coerce")
-
-                    has_coords = data["lat"].notna() & data["lon"].notna()
-
-                    if has_coords.any():
-
-                        gdf = gpd.GeoDataFrame(
-                            data[has_coords],
-                            geometry=gpd.points_from_xy(
-                                data.loc[has_coords, "lon"],
-                                data.loc[has_coords, "lat"]
-                            ),
-                            crs="EPSG:4326"
-                        )
-
-                        gpkg_path = os.path.join(
-                            args.output_dir,
-                            "cwc",
-                            "cwc_timeseries.gpkg"
-                        )
-
-                        gdf.to_file(
-                            gpkg_path,
-                            layer="cwc_timeseries",
-                            driver="GPKG"
-                        )
-
-                        print(f"Saved merged GeoPackage: {gpkg_path} ({len(gdf)} rows)")
-
-                    else:
-                        print("No valid coordinates found — skipping GeoPackage merge")
-
-        except Exception as e:
-            print("GeoPackage merge failed:", str(e))
+        merge_dataset_folder(dataset_dir, gpkg_path, "cwc_timeseries")
 
     # ---------------------------------------------------------
     # Final summary

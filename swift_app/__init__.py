@@ -7,7 +7,7 @@ Public commands are still exposed through:
 - swift ... (if installed)
 """
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __codename__ = "Delta Delhi"
 
 APP_NAME = "SWIFT — Simple WRIS India Fetch Tool"

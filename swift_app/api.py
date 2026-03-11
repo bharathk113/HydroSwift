@@ -40,8 +40,15 @@ class WrisClient:
         self.session.verify = False
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "connection": "keep-alive"
         })
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=20,
+            pool_maxsize=20,
+        )
+
+        self.session.mount("https://", adapter)
 
     def post(self, url: str, payload: dict, retries: int = 3):
         """POST helper with retry and better diagnostics."""
@@ -72,33 +79,25 @@ class WrisClient:
         return None
 
     def check_api(self) -> bool:
-        """Check WRIS availability (handles broken SSL chain)."""
 
-        urls = [
-            "https://indiawris.gov.in/wris",
-            "https://indiawris.gov.in"
-        ]
 
-        for url in urls:
-            try:
-                response = self.session.get(
-                    url,
-                    timeout=10,
-                    verify=False,      # WRIS SSL chain is broken
-                    allow_redirects=True
-                )
+        try:
+            response = self.session.post(
+                BASIN_API,
+                json={"datasetcode": "DISCHARG"},
+                headers=HEADERS,
+                timeout=10,
+                verify=False,
+            )
 
-                print(f"Testing WRIS endpoint: {url}")
-                print("Status:", response.status_code)
+            if response.status_code == 200:
+                return True
 
-                if response.status_code < 400:
-                    return True
-
-            except Exception as e:
-                print("Request failed:", str(e))
+        except Exception:
+            pass
 
         print("\nERROR: Unable to reach WRIS API.")
-        print("WRIS may be down or the endpoint may have changed.")
+        print("WRIS may be down or your system is not connected to the internet.")
         return False
 
     def get_basin_code(self, basin_name: str) -> str:
@@ -197,6 +196,7 @@ class WrisClient:
                 },
                 headers=HEADERS,
                 timeout=60,
+                verify=False # Wris may not be having a valid certifciate (if using a proxy or VPN)
             )
 
             if response.status_code == 200:

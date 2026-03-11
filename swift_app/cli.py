@@ -92,6 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
     download.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing files"
     )
+    download.add_argument(
+    "--merge-only",
+    action="store_true",
+    help="Merge existing station files into a GeoPackage without downloading",
+    )
     parser.add_argument(
     "--cwc",
     action="store_true",

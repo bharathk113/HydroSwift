@@ -29,6 +29,7 @@ If you are reading this while debugging at 2 AM:
 """
 
 from __future__ import annotations
+from .banner import print_wish_banner
 
 import time
 
@@ -43,7 +44,6 @@ def _print_coffee() -> None:
     \      /
      `----'
      TIME FOR A COFFEE BREAK
-     Your request is running in the background...
 """
     )
 
@@ -63,11 +63,15 @@ def main() -> int:
     # ---------------------------------------------------------
     # Coffee ☕
     # ---------------------------------------------------------
-
     if args.coffee:
         _print_coffee()
-        print("Many kinds of monkeys have a strong taste for tea, coffee and spirituous liqueurs.")
-        print("— Charles Darwin")
+        print("Many kinds of monkeys have a strong taste for tea, coffee and spirituous liqueurs. - Charles Darwin")
+
+        # If coffee is the only flag → exit
+        if not any([args.basin, args.cwc, args.cwc_station, args.plot_only]):
+            return 0
+
+        print("\nYour request is running while you enjoy your coffee ☕\n")
 
     # ---------------------------------------------------------
     # External List Mode
@@ -95,13 +99,27 @@ def main() -> int:
     if args.basin:
         from .cli import WRIS_BASINS
         if args.basin in WRIS_BASINS:
-            args.basin = WRIS_BASINS[args.basin]
-
+            key = str(args.basin).strip()
+            if key in WRIS_BASINS:
+                args.basin = WRIS_BASINS[key]
+    # ---------------------------------------------------------
+    # merge-only mode
+    # ---------------------------------------------------------
+    if args.merge_only:
+        from .merge import run_merge_only
+        return run_merge_only(args)
     # ---------------------------------------------------------
     # Plot-only mode
     # ---------------------------------------------------------
 
     if args.plot_only:
+
+        if not args.cwc and not args.basin:
+            raise SystemExit("Plot-only requires --basin (or -b) / --cwc")
+
+        if args.basin and args.basin not in WRIS_BASINS:
+            raise SystemExit(f"Invalid basin id: {args.basin}")
+
         return run_plot_only(args)
 
     # ---------------------------------------------------------
