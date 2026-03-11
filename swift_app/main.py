@@ -69,6 +69,16 @@ def main() -> int:
         return 0
 
     # ---------------------------------------------------------
+    # Banner parsing & Quiet mode
+    # ---------------------------------------------------------
+    
+    if args.coffee:
+        args.quiet = True
+    
+    if not args.quiet:
+        print_wish_banner()
+
+    # ---------------------------------------------------------
     # Coffee ☕
     # ---------------------------------------------------------
     if args.coffee:
@@ -79,7 +89,15 @@ def main() -> int:
         if not any([args.basin, args.cwc, args.cwc_station, args.plot_only]):
             return 0
 
-        print("\nYour request is running while you enjoy your coffee ☕\n")
+        print("\nYour request is running while you enjoy your coffee ☕")
+        if args.cwc or args.cwc_station:
+            log_dir = os.path.join(args.output_dir, "cwc")
+        elif args.basin:
+            log_dir = os.path.join(args.output_dir, args.basin.lower())
+        else:
+            log_dir = args.output_dir
+            
+        print(f"Background log will be saved to: {os.path.join(log_dir, 'swift.log')}\n")
 
     # ---------------------------------------------------------
     # External List Mode
@@ -105,12 +123,14 @@ def main() -> int:
     
     if args.basin and args.basin in WRIS_BASINS:
         args.basin = WRIS_BASINS[args.basin]
+
     # ---------------------------------------------------------
     # merge-only mode
     # ---------------------------------------------------------
     if args.merge_only:
         from .merge import run_merge_only
         return run_merge_only(args)
+        
     # ---------------------------------------------------------
     # Plot-only mode
     # ---------------------------------------------------------
@@ -135,32 +155,26 @@ def main() -> int:
 
         if args.q:
             unsupported.append("discharge")
-
         if args.rf:
             unsupported.append("rainfall")
-
         if args.temp:
             unsupported.append("temperature")
-
         if args.rh:
             unsupported.append("humidity")
-
         if args.solar:
             unsupported.append("solar radiation")
-
         if args.sed:
             unsupported.append("sediment")
-
         if args.gwl:
             unsupported.append("groundwater")
-
         if args.atm:
             unsupported.append("atmospheric pressure")
 
         if unsupported:
             from .download import Console
             Console.warn("CWC API only supports water level data.")
-            print(f"  Ignoring unsupported datasets: {', '.join(unsupported)}\n")
+            if not args.quiet:
+                print(f"  Ignoring unsupported datasets: {', '.join(unsupported)}\n")
 
     # ---------------------------------------------------------
     # CWC mode
@@ -168,6 +182,7 @@ def main() -> int:
 
     if args.cwc or args.cwc_station:
         return run_cwc_download(args)
+
     # ---------------------------------------------------------
     # Default WRIS download
     # ---------------------------------------------------------
@@ -190,11 +205,8 @@ def main() -> int:
     return run_download(args, selected, client, basin_code)
 
 
-
-
 if __name__ == "__main__":
     try:
-        print_wish_banner()
         raise SystemExit(main())
     except KeyboardInterrupt:
         print("\n\nExecution interrupted by user.")

@@ -77,8 +77,10 @@ def load_station_table():
 # Fetch CWC station data
 # ---------------------------------------------------------
 
-def fetch_station_data(code, retries=2):
+def fetch_station_data(code, retries=3):
 
+    import time
+    
     params = {
         "sort-criteria": "%7B%22sortOrderDtos%22:%5B%7B%22sortDirection%22:%22ASC%22,%22field%22:%22id.dataTime%22%7D%5D%7D",
         "specification": (
@@ -89,8 +91,10 @@ def fetch_station_data(code, retries=2):
     }
 
     headers = {"User-Agent": "Mozilla/5.0"}
+    
+    delays = [5, 10, 20]
 
-    for _ in range(retries):
+    for attempt in range(retries):
 
         try:
 
@@ -101,37 +105,32 @@ def fetch_station_data(code, retries=2):
                 timeout=120
             )
 
-            if r.status_code != 200:
-                return None
+            if r.status_code == 200:
+                data = r.json()
 
-            data = r.json()
+                if isinstance(data, list):
+                    rows = []
 
-            if not isinstance(data, list):
-                return None
+                    for j in data:
+                        try:
+                            rows.append([
+                                j["stationCode"],
+                                j["id"]["dataTime"],
+                                j["dataValue"]
+                            ])
+                        except Exception:
+                            pass
 
-            rows = []
-
-            for j in data:
-                try:
-                    rows.append([
-                        j["stationCode"],
-                        j["id"]["dataTime"],
-                        j["dataValue"]
-                    ])
-                except Exception:
-                    pass
-
-            if not rows:
-                return None
-
-            df = pd.DataFrame(rows, columns=["station_code", "time", "wse"])
-
-            df["time"] = pd.to_datetime(df["time"])
-
-            return df
+                    if rows:
+                        df = pd.DataFrame(rows, columns=["station_code", "time", "wse"])
+                        df["time"] = pd.to_datetime(df["time"])
+                        return df
 
         except Exception:
             pass
+            
+        if attempt < retries - 1:
+            time.sleep(delays[attempt])
 
     return None
 
@@ -245,7 +244,7 @@ def run_cwc_download(args):
     import time as _time
     from pathlib import Path
     from concurrent.futures import ThreadPoolExecutor
-    from .download import Console
+    from .download import Console, Logger
 
     try:
         import importlib
@@ -254,12 +253,16 @@ def run_cwc_download(args):
         def tqdm_mod(iterable, **_kwargs):
             return iterable
 
-    Console.section("Dataset: water_level (CWC)")
-
-    dataset_start = _time.time()
-
     base_output = os.path.join(args.output_dir, "cwc", "stations")
     os.makedirs(base_output, exist_ok=True)
+    
+    Console.is_quiet = getattr(args, "quiet", False)
+    logger = Logger(base_output)
+    
+    Console.section("Dataset: water_level (CWC)")
+    logger.log("INFO", "Starting CWC water_level download")
+
+    dataset_start = _time.time()
 
     stations = load_station_table()
 
@@ -271,6 +274,7 @@ def run_cwc_download(args):
         stations = stations[stations["code"].isin(args.cwc_station)]
 
         if stations.empty:
+            logger.log("ERROR", "No matching CWC stations found")
             raise SystemExit("No matching CWC stations found")
 
     n_stations = len(stations)
@@ -283,6 +287,7 @@ def run_cwc_download(args):
         f"Mode: CWC download | Stations: {n_stations} | "
         f"Format: {fmt} | Time range: {start_year}\u2013{end_year}"
     )
+    logger.log("INFO", f"Discovered {n_stations} CWC stations natively")
 
     # ---------------------------------------------------------
     # Resume filter
@@ -306,7 +311,9 @@ def run_cwc_download(args):
 
     if skipped > 0:
         Console.warn(f"Stations skipped (already downloaded): {skipped}")
-        print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
+        if not Console.is_quiet:
+            print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
+        logger.log("INFO", f"Skipped {skipped} existing stations")
 
     downloaded = 0
     workers = min(8, (os.cpu_count() or 1) * 2)
@@ -319,7 +326,8 @@ def run_cwc_download(args):
 
         def _worker(item):
             _, station_row = item
-            return download_station(station_row, base_output, args)
+            res = download_station(station_row, base_output, args)
+            return (res, station_row["code"])
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
 
@@ -332,13 +340,17 @@ def run_cwc_download(args):
                 unit="station",
                 leave=True,
                 dynamic_ncols=True,
+                disable=Console.is_quiet
             ):
                 try:
-                    result = f.result()
+                    result, stcode = f.result()
                     if result is True:
                         downloaded += 1
-                except Exception:
-                    pass
+                        logger.log("SUCCESS", f"Downloaded {stcode}")
+                    elif result is False or result is None:
+                        logger.log("WARN", f"Failed or empty data for {stcode}")
+                except Exception as e:
+                    logger.log("ERROR", f"Worker crash: {str(e)}")
 
     else:
         Console.info("All stations already downloaded \u2014 skipping download step.")
@@ -357,13 +369,18 @@ def run_cwc_download(args):
             if not files:
                 Console.warn("No station files found for plotting")
             else:
-                for f in tqdm_mod(files, desc="Plotting", unit="plot", dynamic_ncols=True):
-                    plot_station(f)
-
+                for f in tqdm_mod(files, desc="Plotting", unit="plot", dynamic_ncols=True, disable=Console.is_quiet):
+                    try:
+                        plot_station(f)
+                    except Exception as pe:
+                        logger.log("WARN", f"Plot failed for {f.name}: {str(pe)}")
+                        
                 Console.success(f"Plots generated: {len(files)}")
+                logger.log("INFO", f"Successfully generated {len(files)} plots")
 
         except Exception as e:
             Console.warn(f"Plotting failed: {str(e)}")
+            logger.log("ERROR", f"Plotting suite failed: {str(e)}")
 
     # ---------------------------------------------------------
     # Merge
@@ -377,6 +394,7 @@ def run_cwc_download(args):
         if downloaded == 0 and os.path.exists(gpkg_path):
             Console.info("Using cached GeoPackage for CWC")
         else:
+            logger.log("INFO", "Merging CWC data to GeoPackage")
             merge_dataset_folder(base_output, gpkg_path, "cwc_timeseries")
 
     # ---------------------------------------------------------
@@ -386,26 +404,30 @@ def run_cwc_download(args):
     runtime = round(_time.time() - dataset_start, 1)
 
     if downloaded > 0:
-        print()
+        if not Console.is_quiet:
+            print()
         Console.success(f"water_level downloaded in {runtime} seconds")
 
     found = downloaded + skipped
+    
+    logger.log("INFO", f"Finished CWC: Downloaded {downloaded}, Skipped {skipped} in {runtime}s")
 
-    print("\n-------------------------------------------------------------")
-    print("Download Summary")
-    print("-------------------------------------------------------------")
-    print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
-    print("-------------------------------------------------------------")
-    print(
-        f"{'water_level':<18}"
-        f"{found:<12}"
-        f"{downloaded:<12}"
-        f"{skipped:<12}"
-        f"{runtime}"
-    )
-    print("-------------------------------------------------------------")
-    print(f"Output directory: {base_output}")
-    print("-------------------------------------------------------------")
+    if not Console.is_quiet:
+        print("\n-------------------------------------------------------------")
+        print("Download Summary")
+        print("-------------------------------------------------------------")
+        print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
+        print("-------------------------------------------------------------")
+        print(
+            f"{'water_level':<18}"
+            f"{found:<12}"
+            f"{downloaded:<12}"
+            f"{skipped:<12}"
+            f"{runtime}"
+        )
+        print("-------------------------------------------------------------")
+        print(f"Output directory: {base_output}")
+        print("-------------------------------------------------------------")
 
     return 0
 

@@ -1,5 +1,5 @@
 """
-SWIFT — Simple WRIS India Fetch Tool
+SWIFT — Simple Water Information Fetch Tool
 Legacy launcher for the modular SWIFT package.
 
 Allows execution without installation:

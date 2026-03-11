@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0 — Echo Edinburgh
+- Implement Background Logging with `swift.log`
+- Introduce `--quiet` mode for clean script/terminal integration
+- `--coffee` mode now runs in background with quiet mode enabled
+- Build exponential backoff logic for CWC API requests
+
 ## 0.4.1 — Delta Delhi - Hotfix/CLI updates
 - Full CWC Output Standardization (matching WRIS API schema)
 - Added dedicated `--list` argument for indexing available WRIS basins and finding CWC stations

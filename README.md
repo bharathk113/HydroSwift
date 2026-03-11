@@ -1,7 +1,7 @@
 
 # SWIFT
 
-## Simple WRIS India Fetch Tool
+## Simple Water Information Fetch Tool
 
 ![Version](https://img.shields.io/badge/version-0.4.1-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Data](https://img.shields.io/badge/data-WRIS%20India-blue) ![Field](https://img.shields.io/badge/field-hydrology-lightblue)
 
@@ -21,119 +21,111 @@ SWIFT reproduces the same API calls used by the WRIS browser interface and autom
 
 This tool is primarily designed for **academic hydrology workflows**.
 
----
-
-## What SWIFT does
-
-SWIFT automatically:
-
-- Discovers basin information (WRIS) or fetches station data (CWC)
-- Maps tributaries and rivers
-- Finds monitoring stations
-- Retrieves station metadata
-- Downloads time-series observations
-- Generates time-series plots
-- Exports data as CSV or XLSX
-- Merges station files into GeoPackage for GIS workflows
+<div align="center">
+  <h1>SWIFT (Simple Water Information Fetch Tool)</h1>
+  <p><strong>Version 1.0.0 — Echo Edinburgh</strong></p>
+  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg">
+  <img src="https://img.shields.io/badge/python-3.9+-brightgreen.svg">
+</div>
 
 ---
 
-## Supported datasets
+SWIFT is a lightweight, dependency-minimal CLI tool designed to batch downoad hydrological time-series data from the [India WRIS](https://indiawris.gov.in/wris/) and **CWC Flood Forecasting** portals.
 
-### WRIS Datasets
-
-| Flag    | Dataset                |
-| ------- | ---------------------- |
-| `-q`    | River Discharge        |
-| `-wl`   | River Water Level      |
-| `-atm`  | Atmospheric Pressure   |
-| `-rf`   | Rainfall               |
-| `-temp` | Temperature            |
-| `-rh`   | Relative Humidity      |
-| `-solar`| Solar Radiation        |
-| `-sed`  | Suspended Sediment     |
-| `-gwl`  | Groundwater Level      |
-
-### CWC Dataset
-
-| Flag    | Dataset                |
-| ------- | ---------------------- |
-| `--cwc` | Water Surface Elevation (wse) |
-
-> CWC only provides water level data from 1,500+ flood forecasting stations.
-
----
-
-## Installation
-
-Clone the repository:
+## Quickstart
 
 ```bash
-git clone https://github.com/carbform/swift
-cd swift
-```
+conda env create -f environment.yml
+conda activate carbform
 
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run directly:
-
-```bash
-python swift.py -h
-```
-
-Run as a module:
-
-```bash
 python -m swift_app -h
 ```
 
-Optional: install a `swift` shell command:
+## Supported Datasets
 
-```bash
-pip install -e .
-```
+**WRIS API**
+- `-q` : River discharge
+- `-wl` : Water level
+- `-atm` : Atmospheric pressure
+- `-rf` : Rainfall
+- `-temp` : Temperature
+- `-rh` : Relative humidity
+- `-solar` : Solar radiation
+- `-sed` : Suspended sediment
+- `-gwl` : Groundwater level
+
+**CWC API (`--cwc`)**
+- `-wl` : Real-time water level (WSE)
+
+## Key Features
+
+1.  **Dual APIs**: Fetch historical data from WRIS or real-time data from CWC.
+2.  **Auto-Discovery**: Provide a basin index, and SWIFT will spider the tributary tree, locate all operational agencies, and discover every active station.
+3.  **Smart Resume**: Automatically skips previously downloaded station files.
+4.  **GeoPackage Export (`--merge`)**: Aggregates hundreds of CSVs into a single QGIS-ready `.gpkg` file.
+5.  **Background Logging**: Every download generates a `swift.log` file tracking success/failures.
+6.  **Scripting Mode**: Use `--quiet` to suppress progress bars and ASCII art when running headless scripts.
 
 ---
 
-## Usage
+## 1. Basic WRIS Downloads
 
-### List available basins and stations
+The `-b` flag is required. You can pass the exact basin name (in quotes) or use the corresponding basin number (e.g. `6` for Krishna). Use `--list` to see all available basins.
 
 ```bash
-python swift.py --list
+# Download discharge and water level data for the Krishna Basin (basin #6)
+python -m swift_app -b 6 -q -wl
 ```
 
-### WRIS Downloads
+## 2. Using the CWC API
 
-Download discharge data from the Krishna basin (use name or number):
+The CWC portal provides real-time flood forecasting telemetry. This data is available under the `--cwc` flag.
 
 ```bash
-python swift.py -b Krishna -q
-python swift.py -b 6 -q           # same as above
+# Download all CWC water level stations across India
+python -m swift_app --cwc -wl
 ```
 
-Download multiple datasets together:
-
+You can target specific CWC stations using their exact station codes:
 ```bash
-python swift.py -b Krishna -q -wl -rf
+python -m swift_app --cwc-station 038-CDJAPR 040-CDJAPR --merge
 ```
 
-### CWC Downloads
+*(Note: Use the `--list` flag to find the path to the complete catalog of CWC station codes).*
 
-Download water level data from all CWC stations:
+## 3. Formatting, Merging, and Plotting
 
+**File Formats**
+Use `--format xlsx` to generate Excel files instead of standard CSVs.
 ```bash
-python swift.py --cwc
+python -m swift_app -b 6 -q --format xlsx
 ```
 
-Download specific CWC stations:
-
+**GeoPackage Merging**
+Instead of handling 500 individual CSVs, combine them into a single GeoPackage.
 ```bash
-python swift.py --cwc --cwc-station 040-CDJAPR
+python -m swift_app -b 6 -q -wl --merge
+```
+*Note:* You can also run `--merge-only` later to build a GeoPackage from existing downloads without hitting the API again.
+
+**Plotting**
+Use `--plot` to automatically generate high-contrast matplotlib time-series graphs for every station downloaded.
+```bash
+python -m swift_app -b 6 -q --plot
+```
+
+## 4. Scripting and Background Modes
+
+**Silent Scripting (`--quiet`)**
+Suppress progress bars and logs for integration with automated scripts.
+```bash
+python -m swift_app -b 6 -q --quiet
+```
+
+**Coffee Break (`--coffee`)**
+Going for a break? The `--coffee` flag shows a nice ASCII banner and forces quiet mode, downloading silently in the background while keeping a clean console. Check the `swift.log` in your output folder later for results!
+```bash
+python -m swift_app --cwc --coffee --merge
 ```
 
 ### Common Flags (WRIS and CWC)

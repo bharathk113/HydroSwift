@@ -25,22 +25,43 @@ class Console:
     YELLOW = "\033[93m"
     CYAN = "\033[96m"
     MAGENTA = "\033[95m"
+    
+    is_quiet = False
 
     @staticmethod
     def section(title):
-        print(f"\n{Console.MAGENTA}{Console.BOLD}{title}{Console.RESET}")
+        if not Console.is_quiet:
+            print(f"\n{Console.MAGENTA}{Console.BOLD}{title}{Console.RESET}")
 
     @staticmethod
     def warn(msg):
-        print(f"{Console.YELLOW}{Console.BOLD}{msg}{Console.RESET}")
+        if not Console.is_quiet:
+            print(f"{Console.YELLOW}{Console.BOLD}{msg}{Console.RESET}")
 
     @staticmethod
     def info(msg):
-        print(f"{Console.CYAN}{msg}{Console.RESET}")
+        if not Console.is_quiet:
+            print(f"{Console.CYAN}{msg}{Console.RESET}")
 
     @staticmethod
     def success(msg):
-        print(f"{Console.GREEN}{Console.BOLD}{msg}{Console.RESET}")
+        if not Console.is_quiet:
+            print(f"{Console.GREEN}{Console.BOLD}{msg}{Console.RESET}")
+
+
+class Logger:
+    """Manages background logging to the output directory."""
+    
+    def __init__(self, output_dir: str):
+        self.log_path = os.path.join(output_dir, "swift.log")
+        
+    def log(self, level: str, msg: str):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with open(self.log_path, "a") as f:
+                f.write(f"[{timestamp}] [{level}] {msg}\n")
+        except Exception:
+            pass
 
 
 try:
@@ -180,6 +201,11 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
 
     base_output = os.path.join(args.output_dir, args.basin.lower())
     os.makedirs(base_output, exist_ok=True)
+    
+    Console.is_quiet = getattr(args, "quiet", False)
+    logger = Logger(base_output)
+    
+    logger.log("INFO", f"Starting WRIS download for basin: {args.basin}")
 
     metadata_records = {}
     metadata_cache = {}
@@ -215,6 +241,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
         var_col = DATASET_COLUMNS.get(dataset_code, "value")
 
         Console.section(f"Dataset: {folder}")
+        logger.log("INFO", f"Processing dataset: {folder}")
 
         dataset_start = time.time()
 
@@ -238,6 +265,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
 
             basin_station_cache[dataset_code] = stations
             cache_updated = True
+            logger.log("INFO", f"Discovered {len(stations)} stations from WRIS API")
 
         dataset_dir = os.path.join(base_output, folder)
         os.makedirs(dataset_dir, exist_ok=True)
@@ -255,7 +283,9 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
 
         if skipped > 0:
             Console.warn(f"Stations skipped (already downloaded): {skipped}")
-            print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
+            if not Console.is_quiet:
+                print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
+            logger.log("INFO", f"Skipped {skipped} existing stations")
 
         counter = {"downloaded": 0}
 
@@ -270,6 +300,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             else:
                 meta = client.get_metadata(station_code, dataset_code)
                 if not meta:
+                    logger.log("WARN", f"No metadata found for station: {station_code}")
                     return
                 metadata_cache[station_code] = meta
 
@@ -281,6 +312,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             )
 
             if frame is None or frame.empty:
+                logger.log("WARN", f"No data returned for station: {station_code}")
                 return
 
             outfile = _save_timeseries(
@@ -298,6 +330,7 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
                 with lock:
                     metadata_records[station_code] = meta
                     counter["downloaded"] += 1
+                logger.log("SUCCESS", f"Downloaded {station_code} -> {os.path.basename(outfile)}")
 
         # ---------------------------------------------------------
         # Parallel download
@@ -317,7 +350,8 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
                     desc=f"{folder}",
                     unit="station",
                     leave=True,
-                    dynamic_ncols=True
+                    dynamic_ncols=True,
+                    disable=Console.is_quiet
                 ):
                     f.result()
 
@@ -335,12 +369,14 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             if counter["downloaded"] == 0 and os.path.exists(gpkg_path):
                 Console.info(f"Using cached GeoPackage for {folder}")
             else:
+                logger.log("INFO", f"Merging {folder} to GeoPackage")
                 merge_dataset_folder(dataset_dir, gpkg_path, folder)
 
         runtime = round(time.time() - dataset_start, 1)
 
         if counter["downloaded"] > 0:
-            print()
+            if not Console.is_quiet:
+                print()
             Console.success(f"{folder} downloaded in {runtime} seconds")
 
         found = counter["downloaded"] + skipped
@@ -352,6 +388,8 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             "skipped": skipped,
             "time": runtime
         })
+        
+        logger.log("INFO", f"Finished {folder}: Downloaded {counter['downloaded']}, Skipped {skipped} in {runtime}s")
 
     # ---------------------------------------------------------
     # Save updated station cache
@@ -368,21 +406,22 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
     # Summary
     # ---------------------------------------------------------
 
-    print("\n-------------------------------------------------------------")
-    print("Download Summary")
-    print("-------------------------------------------------------------")
-    print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
-    print("-------------------------------------------------------------")
+    if not Console.is_quiet:
+        print("\n-------------------------------------------------------------")
+        print("Download Summary")
+        print("-------------------------------------------------------------")
+        print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
+        print("-------------------------------------------------------------")
 
-    for item in summary:
-        print(
-            f"{item['dataset']:<18}"
-            f"{item['found']:<12}"
-            f"{item['downloaded']:<12}"
-            f"{item['skipped']:<12}"
-            f"{item['time']}"
-        )
+        for item in summary:
+            print(
+                f"{item['dataset']:<18}"
+                f"{item['found']:<12}"
+                f"{item['downloaded']:<12}"
+                f"{item['skipped']:<12}"
+                f"{item['time']}"
+            )
 
-    print("-------------------------------------------------------------")
-    print(f"Output directory: {base_output}")
-    print("-------------------------------------------------------------")
+        print("-------------------------------------------------------------")
+        print(f"Output directory: {base_output}")
+        print("-------------------------------------------------------------")

@@ -59,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="swift",
         description=(
-            "SWIFT — Simple WRIS India Fetch Tool\n\n"
+            "SWIFT — Simple Water Information Fetch Tool\n\n"
             "Download hydrological datasets from the India WRIS portal without\n"
             "manually clicking through the website."
         ),
@@ -149,6 +149,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     misc = parser.add_argument_group("Misc")
+    misc.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress console output (progress bars, banners) and run silently",
+    )
     misc.add_argument("--list", action="store_true", help="List available WRIS basins and CWC station info")
     misc.add_argument("--coffee", action="store_true", help="Take a virtual coffee break ☕")
     misc.add_argument(

@@ -1,7 +1,7 @@
 [project]
 name = "swift-wris"
-version = "0.4.1"
-description = "Simple WRIS India Fetch Tool"
+version = "1.0.0"
+description = "Simple Water Information Fetch Tool"
 authors = [{name="Carbform"}]
 requires-python = ">=3.9"
 

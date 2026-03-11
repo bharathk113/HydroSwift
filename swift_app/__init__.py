@@ -7,10 +7,10 @@ Public commands are still exposed through:
 - swift ... (if installed)
 """
 
-__version__ = "0.4.1"
-__codename__ = "Delta Delhi"
+__version__ = "1.0.0"
+__codename__ = "Echo Edinburgh"
 
-APP_NAME = "SWIFT — Simple WRIS India Fetch Tool"
+APP_NAME = "SWIFT — Simple Water Information Fetch Tool"
 APP_ORG = "Carbform • carbform.github.io"
 
 VERSION = f"{__version__}"
