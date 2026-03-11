@@ -18,7 +18,7 @@ def _collect_files(path: Path):
 def run_plot_only(args) -> int:
     """Generate plots from existing SWIFT output folders without downloading."""
 
-    from plot_station_timeseries import plot_station
+    from .plot_station_timeseries import plot_station
 
     # ---------------------------------------------------------
     # WRIS basin directory

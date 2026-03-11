@@ -51,7 +51,7 @@ def _print_coffee() -> None:
 def main() -> int:
     """Main SWIFT execution entry point."""
 
-    from .cli import build_parser, DATASETS, selected_datasets
+    from .cli import build_parser, DATASETS, selected_datasets, WRIS_BASINS
     from .api import WrisClient
     from .plot import run_plot_only
     from .download import run_download
@@ -59,6 +59,14 @@ def main() -> int:
 
     parser = build_parser()
     args = parser.parse_args()
+
+    # ---------------------------------------------------------
+    # No arguments → show help
+    # ---------------------------------------------------------
+    import sys
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return 0
 
     # ---------------------------------------------------------
     # Coffee ☕
@@ -78,7 +86,6 @@ def main() -> int:
     # ---------------------------------------------------------
 
     if args.list:
-        from .cli import WRIS_BASINS
         print("\nAvailable WRIS Basins:")
         for num, name in WRIS_BASINS.items():
             print(f"  [{num}] {name}")
@@ -96,12 +103,8 @@ def main() -> int:
     # Parse numbered basin input (WRIS only)
     # ---------------------------------------------------------
     
-    if args.basin:
-        from .cli import WRIS_BASINS
-        if args.basin in WRIS_BASINS:
-            key = str(args.basin).strip()
-            if key in WRIS_BASINS:
-                args.basin = WRIS_BASINS[key]
+    if args.basin and args.basin in WRIS_BASINS:
+        args.basin = WRIS_BASINS[args.basin]
     # ---------------------------------------------------------
     # merge-only mode
     # ---------------------------------------------------------
@@ -117,8 +120,8 @@ def main() -> int:
         if not args.cwc and not args.basin:
             raise SystemExit("Plot-only requires --basin (or -b) / --cwc")
 
-        if args.basin and args.basin not in WRIS_BASINS:
-            raise SystemExit(f"Invalid basin id: {args.basin}")
+        if args.basin and args.basin not in WRIS_BASINS.values():
+            raise SystemExit(f"Invalid basin: {args.basin}. Use --list to see available basins.")
 
         return run_plot_only(args)
 
@@ -155,11 +158,9 @@ def main() -> int:
             unsupported.append("atmospheric pressure")
 
         if unsupported:
-
-            print("\nWARNING:")
-            print("CWC API only supports water level data.")
-            print("Ignoring unsupported datasets:", ", ".join(unsupported))
-            print()
+            from .download import Console
+            Console.warn("CWC API only supports water level data.")
+            print(f"  Ignoring unsupported datasets: {', '.join(unsupported)}\n")
 
     # ---------------------------------------------------------
     # CWC mode

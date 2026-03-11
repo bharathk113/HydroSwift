@@ -8,8 +8,7 @@ import os
 from pathlib import Path
 import pandas as pd
 import requests
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 # ---------------------------------------------------------
 # HTTP session (connection reuse)
@@ -242,21 +241,25 @@ def download_station(station, output_dir, args):
 
 def run_cwc_download(args):
 
+    import glob
+    import time as _time
     from pathlib import Path
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    from tqdm import tqdm
+    from concurrent.futures import ThreadPoolExecutor
+    from .download import Console
 
-    print("\nCWC downloader starting...")
+    try:
+        import importlib
+        tqdm_mod = importlib.import_module("tqdm").tqdm
+    except Exception:
+        def tqdm_mod(iterable, **_kwargs):
+            return iterable
 
-    base_output = os.path.join(
-        args.output_dir,
-        "cwc",
-        "stations"
-    )
+    Console.section("Dataset: water_level (CWC)")
 
+    dataset_start = _time.time()
+
+    base_output = os.path.join(args.output_dir, "cwc", "stations")
     os.makedirs(base_output, exist_ok=True)
-
-    print("Output directory:", base_output)
 
     stations = load_station_table()
 
@@ -265,127 +268,144 @@ def run_cwc_download(args):
     # ---------------------------------------------------------
 
     if args.cwc_station:
-
-        stations = stations[
-            stations["code"].isin(args.cwc_station)
-        ]
+        stations = stations[stations["code"].isin(args.cwc_station)]
 
         if stations.empty:
             raise SystemExit("No matching CWC stations found")
-
-    # ---------------------------------------------------------
-    # Execution summary
-    # ---------------------------------------------------------
 
     n_stations = len(stations)
 
     start_year = str(args.start_date)[:4] if args.start_date else "1950"
     end_year = str(args.end_date)[:4] if args.end_date else "2026"
-
     fmt = args.format.upper()
 
-    print(
+    Console.info(
         f"Mode: CWC download | Stations: {n_stations} | "
-        f"Format: {fmt} | Time range: {start_year}–{end_year}"
+        f"Format: {fmt} | Time range: {start_year}\u2013{end_year}"
     )
 
-    print("Total stations available:", n_stations)
+    # ---------------------------------------------------------
+    # Resume filter
+    # ---------------------------------------------------------
+
+    ext = args.format.lower()
+    all_codes = [str(row["code"]).strip() for _, row in stations.iterrows()]
+
+    if args.overwrite:
+        station_list = list(stations.iterrows())
+    else:
+        station_list = []
+        for _, row in stations.iterrows():
+            code = str(row["code"]).strip()
+            pattern = os.path.join(base_output, f"{code}_*.{ext}")
+            if not glob.glob(pattern):
+                station_list.append((_, row))
+
+    remaining = len(station_list)
+    skipped = 0 if args.overwrite else n_stations - remaining
+
+    if skipped > 0:
+        Console.warn(f"Stations skipped (already downloaded): {skipped}")
+        print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
 
     downloaded = 0
-    skipped = 0
     workers = min(8, (os.cpu_count() or 1) * 2)
 
     # ---------------------------------------------------------
     # Parallel downloads
     # ---------------------------------------------------------
 
-    with ThreadPoolExecutor(max_workers=workers) as executor:
+    if remaining > 0:
 
-        futures = [
-            executor.submit(download_station, station, base_output, args)
-            for _, station in stations.iterrows()
-        ]
+        def _worker(item):
+            _, station_row = item
+            return download_station(station_row, base_output, args)
 
-        for future in tqdm(
-            as_completed(futures),
-            total=len(futures),
-            desc="Downloading CWC station data",
-            ncols=100
-        ):
+        with ThreadPoolExecutor(max_workers=workers) as executor:
 
-            try:
-                result = future.result()
+            futures = [executor.submit(_worker, item) for item in station_list]
 
-                if result is True:
-                    downloaded += 1
+            for f in tqdm_mod(
+                futures,
+                total=len(futures),
+                desc="water_level",
+                unit="station",
+                leave=True,
+                dynamic_ncols=True,
+            ):
+                try:
+                    result = f.result()
+                    if result is True:
+                        downloaded += 1
+                except Exception:
+                    pass
 
-                elif result == "skipped":
-                    skipped += 1
-
-            except Exception:
-                pass
+    else:
+        Console.info("All stations already downloaded \u2014 skipping download step.")
 
     # ---------------------------------------------------------
     # Plotting
     # ---------------------------------------------------------
 
     if args.plot:
-
         try:
-
-            from plot_station_timeseries import plot_station  # noqa: external script
-
-            print("\nGenerating hydrographs...")
+            from .plot_station_timeseries import plot_station
 
             files = list(Path(base_output).glob("*.csv"))
             files.extend(Path(base_output).glob("*.xlsx"))
 
             if not files:
-                print("No station files found for plotting")
-
+                Console.warn("No station files found for plotting")
             else:
-
-                for f in tqdm(files, desc="Plotting", ncols=100):
+                for f in tqdm_mod(files, desc="Plotting", unit="plot", dynamic_ncols=True):
                     plot_station(f)
 
-                print("Plots generated:", len(files))
+                Console.success(f"Plots generated: {len(files)}")
 
         except Exception as e:
-            print("Plotting failed:", str(e))
+            Console.warn(f"Plotting failed: {str(e)}")
 
-    from .merge import merge_dataset_folder
+    # ---------------------------------------------------------
+    # Merge
+    # ---------------------------------------------------------
 
     if args.merge:
+        from .merge import merge_dataset_folder
 
-        dataset_dir = base_output
+        gpkg_path = os.path.join(args.output_dir, "cwc", "cwc_timeseries.gpkg")
 
-        gpkg_path = os.path.join(
-            args.output_dir,
-            "cwc",
-            "cwc_timeseries.gpkg"
-        )
-
-        merge_dataset_folder(dataset_dir, gpkg_path, "cwc_timeseries")
+        if downloaded == 0 and os.path.exists(gpkg_path):
+            Console.info("Using cached GeoPackage for CWC")
+        else:
+            merge_dataset_folder(base_output, gpkg_path, "cwc_timeseries")
 
     # ---------------------------------------------------------
-    # Final summary
+    # Summary table (mirrors WRIS format)
     # ---------------------------------------------------------
 
+    runtime = round(_time.time() - dataset_start, 1)
+
+    if downloaded > 0:
+        print()
+        Console.success(f"water_level downloaded in {runtime} seconds")
+
+    found = downloaded + skipped
+
+    print("\n-------------------------------------------------------------")
+    print("Download Summary")
+    print("-------------------------------------------------------------")
+    print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
+    print("-------------------------------------------------------------")
     print(
-f"""
-----------------------------------------------------
-Done!
-----------------------------------------------------
-Dataset: CWC gauges
-Stations processed: {n_stations}
-Downloaded: {downloaded}
-Skipped (already exist): {skipped}
-Output directory: {base_output}
-----------------------------------------------------
-"""
+        f"{'water_level':<18}"
+        f"{found:<12}"
+        f"{downloaded:<12}"
+        f"{skipped:<12}"
+        f"{runtime}"
     )
-
-    if skipped and not args.overwrite:
-        print("Tip: use --overwrite to force re-download\n")
+    print("-------------------------------------------------------------")
+    print(f"Output directory: {base_output}")
+    print("-------------------------------------------------------------")
 
     return 0
+

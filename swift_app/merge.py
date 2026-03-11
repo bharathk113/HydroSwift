@@ -61,7 +61,6 @@ def merge_dataset_folder(dataset_dir: str, gpkg_path: str, layer: str):
 def run_merge_only(args):
 
     from .cli import selected_datasets
-    from .merge import merge_dataset_folder
 
     selected = selected_datasets(args)
 

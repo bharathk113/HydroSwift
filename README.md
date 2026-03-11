@@ -3,13 +3,13 @@
 
 ## Simple WRIS India Fetch Tool
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Data](https://img.shields.io/badge/data-WRIS%20India-blue) ![Field](https://img.shields.io/badge/field-hydrology-lightblue)
+![Version](https://img.shields.io/badge/version-0.4.1-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Data](https://img.shields.io/badge/data-WRIS%20India-blue) ![Field](https://img.shields.io/badge/field-hydrology-lightblue)
 
 ---
 
 ## Overview
 
-SWIFT is a lightweight Python tool for downloading hydrological time-series data from the **India WRIS portal**:
+SWIFT is a lightweight Python tool for downloading hydrological time-series data from the **India WRIS portal** and the **CWC Flood Forecasting** API:
 
 > https://indiawris.gov.in
 
@@ -27,20 +27,24 @@ This tool is primarily designed for **academic hydrology workflows**.
 
 SWIFT automatically:
 
-- Discovers basin information
+- Discovers basin information (WRIS) or fetches station data (CWC)
 - Maps tributaries and rivers
 - Finds monitoring stations
 - Retrieves station metadata
 - Downloads time-series observations
-- Generates time-series plots of the downloaded data
+- Generates time-series plots
+- Exports data as CSV or XLSX
+- Merges station files into GeoPackage for GIS workflows
 
 ---
 
 ## Supported datasets
 
+### WRIS Datasets
+
 | Flag    | Dataset                |
 | ------- | ---------------------- |
-| `-q`    | River Water Discharge  |
+| `-q`    | River Discharge        |
 | `-wl`   | River Water Level      |
 | `-atm`  | Atmospheric Pressure   |
 | `-rf`   | Rainfall               |
@@ -49,6 +53,14 @@ SWIFT automatically:
 | `-solar`| Solar Radiation        |
 | `-sed`  | Suspended Sediment     |
 | `-gwl`  | Groundwater Level      |
+
+### CWC Dataset
+
+| Flag    | Dataset                |
+| ------- | ---------------------- |
+| `--cwc` | Water Surface Elevation (wse) |
+
+> CWC only provides water level data from 1,500+ flood forecasting stations.
 
 ---
 
@@ -67,8 +79,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-SWIFT can directly be run with Python or installed as a module:
-
+Run directly:
 
 ```bash
 python swift.py -h
@@ -80,36 +91,29 @@ Run as a module:
 python -m swift_app -h
 ```
 
-Optional: install a `swift` shell command (only if you want it):
+Optional: install a `swift` shell command:
 
 ```bash
 pip install -e .
-```
-
-```bash
-swift -b Krishna -h
 ```
 
 ---
 
 ## Usage
 
-Download discharge data from the Krishna basin:
+### List available basins and stations
+
+```bash
+python swift.py --list
+```
+
+### WRIS Downloads
+
+Download discharge data from the Krishna basin (use name or number):
 
 ```bash
 python swift.py -b Krishna -q
-```
-
-You can run the equivalent module command as well:
-
-```bash
-python -m swift_app -b Krishna -q
-```
-
-Download water level data:
-
-```bash
-python swift.py -b Krishna -wl
+python swift.py -b 6 -q           # same as above
 ```
 
 Download multiple datasets together:
@@ -118,95 +122,109 @@ Download multiple datasets together:
 python swift.py -b Krishna -q -wl -rf
 ```
 
-Overwrite existing files (useful for testing):
+### CWC Downloads
+
+Download water level data from all CWC stations:
 
 ```bash
-python swift.py -b Krishna -q --overwrite
+python swift.py --cwc
 ```
 
-Save station metadata:
+Download specific CWC stations:
 
 ```bash
-python swift.py -b Krishna -q --metadata
+python swift.py --cwc --cwc-station 040-CDJAPR
 ```
 
-Export station geometry:
+### Common Flags (WRIS and CWC)
+
+| Flag | Description |
+| ---- | ----------- |
+| `--plot` | Generate time-series plots after download |
+| `--merge` | Merge all station files into a GeoPackage |
+| `--format csv\|xlsx` | Output file format (default: csv) |
+| `--output-dir DIR` | Custom output directory (default: output) |
+| `--overwrite` | Overwrite existing files |
+| `--start-date YYYY-MM-DD` | Filter start date |
+| `--end-date YYYY-MM-DD` | Filter end date |
+| `--metadata` | Save station metadata as CSV (WRIS only) |
+| `--coffee` | Take a coffee break ☕ |
+| `--list` | List available basins and CWC station info |
+| `--plot-only` | Generate plots from existing output (no download) |
+
+### Examples
+
+Download Krishna discharge with plots and GeoPackage merge:
 
 ```bash
-python swift.py -b Krishna -q --geopackage
+python swift.py -b 6 -q --plot --merge
 ```
 
-Export station list:
+Download CWC data with XLSX format and merge:
 
 ```bash
-python swift.py -b Krishna -q --stations
+python swift.py --cwc --format xlsx --merge
 ```
 
-Merge downloaded stations into one dataset:
+Custom date range for CWC:
 
 ```bash
-python swift.py -b Krishna -q --merge
-```
-
-Custom output directory:
-
-```bash
-python swift.py -b Krishna -q --output-dir data
-```
-
-Take a virtual coffee break:
-
-```bash
-python swift.py -b Krishna -q --coffee
+python swift.py --cwc --start-date 2020-01-01 --end-date 2024-12-31
 ```
 
 ---
 
-## Example Output
+## Output Structure
 
-Downloaded data are automatically organised by basin and dataset:
+### WRIS
 
 ```text
 output/
     krishna/
         discharge/
-            029-LKDHYD_Suddakal_DISCHARG.csv
+            002-UKDPUNE_Warunji_DISCHARG.csv
+        Krishna_discharge.gpkg          # if --merge is used
+
+images/
+    wris/
+        krishna/
+            discharge/
+                station_plot.png
 ```
 
-Plotting
+### CWC
 
-SWIFT can generate station time series plots automatically.
-
-During download:
-
-```bash
-python swift.py -b Krishna -q --plot
-```
-
-Or generate plots later using existing data:
-
-```bash
-python swift.py -b Krishna --plot-only
-```
-
-Plots are saved in:
 ```text
-images/
-    krishna/
-        discharge/
-            station_plot.png
-
 output/
-    krishna/
-        discharge/
-        water_level/
-        rainfall/
+    cwc/
+        stations/
+            040-CDJAPR_parwan_pick-up_weir.csv
+        cwc_timeseries.gpkg             # if --merge is used
 
 images/
-    krishna/
-        discharge/
-        rainfall/
+    cwc/
+        CWC_040-CDJAPR_parwan_pick-up_weir.png
 ```
+
+### Standardized CSV Schema
+
+All output files follow a consistent 6-column schema:
+
+```csv
+station_code,time,{variable},unit,lat,lon
+```
+
+Where `{variable}` is `q`, `wl`, `wse`, `rf`, etc. depending on the dataset.
+
+---
+
+## Resume Support
+
+SWIFT automatically skips stations that have already been downloaded. If a download is interrupted, simply re-run the same command — only missing stations will be fetched.
+
+Use `--overwrite` to force redownload of all stations.
+
+---
 
 ## Notes
 
@@ -216,21 +234,9 @@ images/
 
 ---
 
-<!-- ## Version Naming
-
-Each major SWIFT release receives a city-themed codename:
-
-- Analog Amsterdam
-- Bravo Boston
-- Cryo Copenhagen
-- Delta Delhi
-- Echo Edinburgh
-- Flux Florence
-- Glacier Geneva -->
-
 **Current release:**
 
-`0.4.0 — Delta Delhi`
+`0.4.1 — Delta Delhi`
 
 ---
 
@@ -242,9 +248,9 @@ MIT License.
 
 ## Acknowledgement
 
-Hydrological data are provided by the India WRIS portal.
+Hydrological data are provided by the India WRIS portal and CWC Flood Forecasting System.
 
-If you use the downloaded datasets in publications, please cite the WRIS data source appropriately.
+If you use the downloaded datasets in publications, please cite the data sources appropriately.
 
 ---
 
