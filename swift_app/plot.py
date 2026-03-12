@@ -18,30 +18,35 @@ def _collect_files(path: Path):
 def run_plot_only(args) -> int:
     """Generate plots from existing SWIFT output folders without downloading."""
 
+    import os
+    from pathlib import Path
+    from .cli import DATASETS, selected_datasets
     from .plot_station_timeseries import plot_station
 
+    if not args.input_dir:
+        raise SystemExit("--plot-only requires input_dir")
+
+    root = Path(args.input_dir)
+
+    if not root.exists():
+        raise SystemExit("Input directory not found")
+
     # ---------------------------------------------------------
-    # WRIS basin directory
+    # Dataset folder names
     # ---------------------------------------------------------
 
-    basin_dir = None
-    if args.basin:
-        basin_dir = Path(args.output_dir) / args.basin.lower()
+    dataset_names = {folder for _, folder in DATASETS.values()}
 
     # ---------------------------------------------------------
-    # CWC directory
+    # Detect basin directories
     # ---------------------------------------------------------
 
-    cwc_dir = Path(args.output_dir) / "cwc" / "stations"
+    if any((root / d).is_dir() and d in dataset_names for d in os.listdir(root)):
+        basin_dirs = [root]
+    else:
+        basin_dirs = [d for d in root.iterdir() if d.is_dir()]
 
-    selected_variables = [
-        folder_name for key, (_, folder_name) in DATASETS.items()
-        if getattr(args, key)
-    ]
-
-    # Ignore WRIS dataset flags when plotting CWC data
-    if args.cwc:
-        selected_variables = []
+    selected = selected_datasets(args)
 
     print("\nPlot-only mode enabled.")
 
@@ -52,6 +57,8 @@ def run_plot_only(args) -> int:
     # ---------------------------------------------------------
 
     if args.cwc:
+
+        cwc_dir = root / "cwc" / "stations"
 
         if not cwc_dir.exists():
             print("No CWC output found.")
@@ -76,14 +83,16 @@ def run_plot_only(args) -> int:
     # WRIS plotting
     # ---------------------------------------------------------
 
-    if basin_dir and basin_dir.exists():
+    for basin_dir in basin_dirs:
 
-        if not selected_variables:
+        basin = basin_dir.name
+
+        if not selected:
 
             files = _collect_files(basin_dir)
 
             if files:
-                print("Scanning WRIS basin folder:", basin_dir)
+                print(f"\nScanning WRIS basin folder: {basin_dir}")
                 print("Stations found:", len(files))
 
                 for file in files:
@@ -92,16 +101,17 @@ def run_plot_only(args) -> int:
 
         else:
 
-            for variable in selected_variables:
+            for _, folder in selected.items():
 
-                variable_dir = basin_dir / variable
+                variable_dir = basin_dir / folder
 
                 if not variable_dir.exists():
+                    print(f"Dataset '{folder}' not found in basin: {basin}")
                     continue
 
                 files = _collect_files(variable_dir)
 
-                print(f"Plotting {variable} ({len(files)} stations)")
+                print(f"\nPlotting {basin} / {folder} ({len(files)} stations)")
 
                 for file in files:
                     plot_station(file)

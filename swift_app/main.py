@@ -50,19 +50,37 @@ def _print_coffee() -> None:
 def main() -> int:
     """Main SWIFT execution entry point."""
 
+    import os
+    import sys
+    from pathlib import Path
+
     from .cli import build_parser, DATASETS, selected_datasets, WRIS_BASINS
     from .api import WrisClient
     from .plot import run_plot_only
     from .download import run_download
     from .cwc import run_cwc_download
+    from .merge import merge_dataset_folder
 
     parser = build_parser()
     args = parser.parse_args()
 
+    def is_valid_basin_folder(folder: Path):
+
+        dataset_names = {folder for _, folder in DATASETS.values()}
+
+        try:
+            for d in folder.iterdir():
+                if d.is_dir() and d.name in dataset_names:
+                    return True
+        except Exception:
+            pass
+
+        return False
+
     # ---------------------------------------------------------
     # No arguments → show help
     # ---------------------------------------------------------
-    import sys
+
     if len(sys.argv) == 1:
         parser.print_help()
         return 0
@@ -70,82 +88,112 @@ def main() -> int:
     # ---------------------------------------------------------
     # Banner parsing & Quiet mode
     # ---------------------------------------------------------
-    
+
     if args.coffee:
         args.quiet = True
-    
-    if not args.quiet:
+
+    # Show banner only for CLI execution
+    if not args.quiet and __name__ == "__main__":
         print_wish_banner()
 
     # ---------------------------------------------------------
     # Coffee ☕
     # ---------------------------------------------------------
+
     if args.coffee:
         _print_coffee()
-        print("Many kinds of monkeys have a strong taste for tea, coffee and spirituous liqueurs. - Charles Darwin")
 
-        # If coffee is the only flag → exit
         if not any([args.basin, args.cwc, args.cwc_station, args.plot_only]):
             return 0
 
-        print("\nYour request is running while you enjoy your coffee ☕")
-        if args.cwc or args.cwc_station:
-            log_dir = os.path.join(args.output_dir, "cwc")
-        elif args.basin:
-            log_dir = os.path.join(args.output_dir, args.basin.lower())
-        else:
-            log_dir = args.output_dir
-            
-        print(f"Background log will be saved to: {os.path.join(log_dir, 'swift.log')}\n")
-
     # ---------------------------------------------------------
-    # External List Mode
+    # List mode
     # ---------------------------------------------------------
 
     if args.list:
         print("\nAvailable WRIS Basins:")
         for num, name in WRIS_BASINS.items():
             print(f"  [{num}] {name}")
-        
-        print("\nAvailable CWC Stations:")
-        print("  The CWC dataset covers over 1,500 individual stations.")
-        print("  To view the full catalog of station codes and names, please check the local file:")
-        print("  →  swift_app/cwc_stations.csv")
-        print("\n  If you are browsing the repository, you can find it here:")
-        print("  →  https://github.com/carbform/swift/blob/dev/swift_app/cwc_stations.csv\n")
-        
         return 0
 
     # ---------------------------------------------------------
-    # Parse numbered basin input (WRIS only)
+    # Parse numbered basin input
     # ---------------------------------------------------------
-    
+
     if args.basin and args.basin in WRIS_BASINS:
         args.basin = WRIS_BASINS[args.basin]
 
     # ---------------------------------------------------------
-    # merge-only mode
+    # MERGE-ONLY MODE
     # ---------------------------------------------------------
+
     if args.merge_only:
-        from .merge import run_merge_only
-        return run_merge_only(args)
-        
+
+        if not args.input_dir:
+            raise SystemExit("--merge-only requires --input-dir")
+
+        root = Path(args.input_dir)
+
+        if not root.exists():
+            raise SystemExit("Input directory not found")
+
+        # -----------------------------------------------------
+        # Detect basin folders
+        # -----------------------------------------------------
+
+        dataset_names = {folder for _, folder in DATASETS.values()}
+
+        if any((root / d).is_dir() and d in dataset_names for d in os.listdir(root)):
+            basin_dirs = [root]
+        else:
+            basin_dirs = [ d for d in root.iterdir()
+            if d.is_dir() and is_valid_basin_folder(d)
+            ]
+
+        selected = selected_datasets(args)
+
+        output_base = Path(args.output_dir) if args.output_dir else root
+        output_base.mkdir(parents=True, exist_ok=True)
+
+        for basin_dir in basin_dirs:
+
+            basin = basin_dir.name
+
+            if not selected:
+                dataset_dirs = [
+                    d for d in basin_dir.iterdir() if d.is_dir()
+                ]
+            else:
+                dataset_dirs = [
+                    basin_dir / folder for _, folder in selected.items()
+                ]
+
+            for d in dataset_dirs:
+
+                gpkg_path = output_base / f"{basin}_{d.name}.gpkg"
+
+                merge_dataset_folder(str(d), str(gpkg_path), d.name)
+
+        return 0
+
     # ---------------------------------------------------------
-    # Plot-only mode
+    # PLOT-ONLY MODE
     # ---------------------------------------------------------
 
     if args.plot_only:
 
-        if not args.cwc and not args.basin:
-            raise SystemExit("Plot-only requires --basin (or -b) / --cwc")
+        if not args.input_dir:
+            raise SystemExit("--plot-only requires --input-dir")
 
-        if args.basin and args.basin not in WRIS_BASINS.values():
-            raise SystemExit(f"Invalid basin: {args.basin}. Use --list to see available basins.")
+        root = Path(args.input_dir)
+
+        if not root.exists():
+            raise SystemExit("Input directory not found")
 
         return run_plot_only(args)
 
     # ---------------------------------------------------------
-    # Dataset compatibility check
+    # CWC compatibility check
     # ---------------------------------------------------------
 
     if args.cwc:
@@ -176,13 +224,16 @@ def main() -> int:
                 print(f"  Ignoring unsupported datasets: {', '.join(unsupported)}\n")
 
     # ---------------------------------------------------------
-    # CWC mode
+    # CWC download
     # ---------------------------------------------------------
 
     if args.cwc or args.cwc_station:
         return run_cwc_download(args)
-    
+
+    # ---------------------------------------------------------
     # Citation
+    # ---------------------------------------------------------
+
     if args.cite:
         print("""
         If you use SWIFT in your research, please consider citing:
@@ -198,7 +249,7 @@ def main() -> int:
         return 0
 
     # ---------------------------------------------------------
-    # Default WRIS download
+    # DEFAULT WRIS DOWNLOAD
     # ---------------------------------------------------------
 
     if not args.basin:
@@ -217,16 +268,3 @@ def main() -> int:
         raise SystemExit("No dataset selected")
 
     return run_download(args, selected, client, basin_code)
-
-
-if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except KeyboardInterrupt:
-        print("\n\nExecution interrupted by user.")
-        raise SystemExit(130)
-    except Exception as exc:
-        print("\nERROR: SWIFT encountered an unexpected issue.")
-        print("Reason:", str(exc))
-        print("Try running again or check network/API status.")
-        raise SystemExit(1)

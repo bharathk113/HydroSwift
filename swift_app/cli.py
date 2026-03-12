@@ -146,6 +146,10 @@ def build_parser() -> argparse.ArgumentParser:
     output.add_argument(
         "--metadata", action="store_true", help="Save station metadata as CSV"
     )
+    output.add_argument(
+    "--input-dir",
+    help="Directory containing previously downloaded SWIFT basin data",
+    )
 
     output.add_argument(
         "--plot",

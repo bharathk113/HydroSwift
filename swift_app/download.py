@@ -212,7 +212,18 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
     summary = []
     lock = Lock()
 
-    basin_structure = build_basin_structure(client, basin_code)
+    # ---------------------------------------------------------
+    # Basin structure cache (in-memory)
+    # ---------------------------------------------------------
+
+    if not hasattr(client, "_basin_structure_cache"):
+        client._basin_structure_cache = {}
+
+    if basin_code not in client._basin_structure_cache:
+        client._basin_structure_cache[basin_code] = build_basin_structure(client, basin_code)
+
+    basin_structure = client._basin_structure_cache[basin_code]
+
     agency_cache = {}
     station_cache = {}
 
@@ -232,6 +243,37 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
         basin_station_cache = {}
 
     cache_updated = False
+
+    # ---------------------------------------------------------
+    # Estimate total runtime across all datasets
+    # ---------------------------------------------------------
+
+    total_stations = 0
+
+    for dataset_code in selected.keys():
+
+        if dataset_code in basin_station_cache:
+            stations = basin_station_cache[dataset_code]
+        else:
+            stations = discover_stations(
+                client,
+                basin_structure,
+                dataset_code,
+                agency_cache,
+                station_cache
+            )
+            basin_station_cache[dataset_code] = stations
+            cache_updated = True
+
+        total_stations += len(stations)
+
+    workers = min(8, (os.cpu_count() or 1) * 2)
+    est_runtime = int(total_stations * args.delay / max(workers, 1))
+
+    if est_runtime > 600 and not Console.is_quiet:
+        mins = est_runtime // 60
+        Console.info(f"Estimated total runtime: ~{mins} minutes ({total_stations} stations)")
+        print(f"{Console.ITALIC}Tip: enable --coffee mode for long runs ☕{Console.RESET}")
 
     for dataset_code, folder in selected.items():
 

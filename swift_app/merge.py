@@ -60,24 +60,63 @@ def merge_dataset_folder(dataset_dir: str, gpkg_path: str, layer: str):
    
 def run_merge_only(args):
 
-    from .cli import selected_datasets
+    import os
+    from pathlib import Path
+    from .cli import DATASETS, selected_datasets
+    from .merge import merge_dataset_folder
+
+    if not args.input_dir:
+        raise SystemExit("--merge-only requires input_dir")
+
+    root = Path(args.input_dir)
+
+    if not root.exists():
+        raise SystemExit("Input directory not found")
+
+    dataset_names = {folder for _, folder in DATASETS.values()}
+
+    # ---------------------------------------------------------
+    # Detect basin directories
+    # ---------------------------------------------------------
+
+    if any((root / d).is_dir() and d in dataset_names for d in os.listdir(root)):
+        basin_dirs = [root]
+    else:
+        basin_dirs = [d for d in root.iterdir() if d.is_dir()]
 
     selected = selected_datasets(args)
 
-    if not selected:
-        raise SystemExit("Specify dataset flag(s) to merge")
+    output_base = Path(args.output_dir) if args.output_dir else root
+    output_base.mkdir(parents=True, exist_ok=True)
 
-    base = os.path.join(args.output_dir, args.basin.lower())
+    # ---------------------------------------------------------
+    # Merge datasets
+    # ---------------------------------------------------------
 
-    for _, folder in selected.items():
+    for basin_dir in basin_dirs:
 
-        dataset_dir = os.path.join(base, folder)
+        basin = basin_dir.name
 
-        gpkg_path = os.path.join(
-            base,
-            f"{args.basin}_{folder}.gpkg"
-        )
+        if not selected:
+            dataset_dirs = [
+                d for d in basin_dir.iterdir()
+                if d.is_dir()
+            ]
+        else:
+            dataset_dirs = [
+                basin_dir / folder
+                for _, folder in selected.items()
+            ]
 
-        merge_dataset_folder(dataset_dir, gpkg_path, folder)
+        for d in dataset_dirs:
+
+            if not d.exists():
+                if selected:
+                    print(f"Dataset '{d.name}' not found in basin: {basin}")
+                continue
+
+            gpkg_path = output_base / f"{basin}_{d.name}.gpkg"
+
+            merge_dataset_folder(str(d), str(gpkg_path), d.name)
 
     return 0
