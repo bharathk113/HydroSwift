@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 — Echo Edinburgh
+## 1.0.0 — Arctic Amsterdam
 - Implement Background Logging with `swift.log`
 - Introduce `--quiet` mode for clean script/terminal integration
 - `--coffee` mode now runs in background with quiet mode enabled

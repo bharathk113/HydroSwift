@@ -1,10 +1,9 @@
 """
 SWIFT — Main CLI Entrypoint (Modular Core)
--------------------------------------------
 
-Version: 0.4.1 — Delta Delhi
+Version: 1.0.0 — Arctic Amsterdam
+ 
 
-Author
 ------
 Carbform (www.carbform.github.io)
 

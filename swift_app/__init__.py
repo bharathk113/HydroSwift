@@ -8,7 +8,7 @@ Public commands are still exposed through:
 """
 
 __version__ = "1.0.0"
-__codename__ = "Echo Edinburgh"
+__codename__ = "Arctic Amsterdam"
 
 APP_NAME = "SWIFT — Simple Water Information Fetch Tool"
 APP_ORG = "Carbform • carbform.github.io"
