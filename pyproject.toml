@@ -22,3 +22,8 @@ all = ["geopandas", "shapely", "rich"]
 
 [project.scripts]
 swift = "swift_app.main:main"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:datetime.datetime.utcfromtimestamp\\(\\) is deprecated:DeprecationWarning"
+]

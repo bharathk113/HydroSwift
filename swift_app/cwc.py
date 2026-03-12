@@ -287,6 +287,11 @@ def run_cwc_download(args):
         f"Mode: CWC download | Stations: {n_stations} | "
         f"Format: {fmt} | Time range: {start_year}\u2013{end_year}"
     )
+    
+    if not Console.is_quiet:
+        print(f"{Console.ITALIC}Note: The CWC servers stream full historical datasets at slow speeds (~100 KB/s).{Console.RESET}")
+        print(f"{Console.ITALIC}A single station may take 1-2 minutes to appear on the progress bar. Please do not cancel the process.{Console.RESET}\n")
+
     logger.log("INFO", f"Discovered {n_stations} CWC stations natively")
 
     # ---------------------------------------------------------
