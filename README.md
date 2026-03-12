@@ -23,9 +23,10 @@ SWIFT automates basin discovery, station enumeration, time‑series downloads, a
 
 FEATURES
 
-- Automated discovery of hydrological stations
-- Parallel download of time‑series observations
-- Support for multiple hydrological variables
+- Automated discovery of hydrological stations list via CLI or Python API
+- Parallel download of time‑series observations with exponential backoff
+- Support for multiple hydrological variables (Discharge, Rainfall, Groundwater, etc.)
+- Extensible Python API for seamless integration into Jupyter Notebooks and custom scripts
 - Integration with WRIS and CWC data services
 - GeoPackage export for GIS workflows
 - Hydrograph / Time Series plotting utilities
@@ -56,7 +57,40 @@ After installation, verify SWIFT is working by running:
 
 This should display the SWIFT command-line interface and available options.
 
-## Minimal Example
+## Python API Usage
+
+SWIFT is primarily designed as a robust Python module for programmatic use in your research scripts and Jupyter Notebooks.
+
+```python
+import swift_app
+
+# 1. Search for available stations
+wris_stations = swift_app.search_stations(dataset="discharge", basin="Godavari")
+cwc_stations = swift_app.cwc_stations()
+
+# 2. Download specific CWC stations
+swift_app.download(
+    cwc=True, 
+    cwc_station=["040-CDJAPR", "038-CDJAPR"], 
+    start_date="2010-01-01", 
+    format="xlsx",
+    plot=True
+)
+
+# 3. Download an entire WRIS basin silently
+swift_app.download(
+    basin="Krishna", 
+    dataset_flags=["q"], 
+    merge=True, 
+    quiet=True
+)
+```
+
+------------------------------------------------------------
+
+## Command Line Interface (CLI)
+
+SWIFT can also be used as a standalone command-line tool for rapid data acquisition without writing code.
 
 Download discharge observations for the Krishna basin:
 
@@ -68,11 +102,7 @@ This command will:
 2. Download available time series
 3. Store the data in the `output/` directory
 
-EXAMPLE USAGE
-
-Download discharge observations for the Krishna basin:
-
-    swift -b krishna -q
+### CLI Examples
 
 Download multiple datasets:
 
@@ -89,6 +119,10 @@ Merge downloaded station datasets into a GeoPackage:
 Generate time series plots from downloaded data:
 
     swift --plot-only -b krishna
+
+Run silently in the background (no console UI):
+
+    swift -b krishna -q --quiet
 
 ------------------------------------------------------------
 
@@ -121,9 +155,8 @@ CITATION
 
 If you use SWIFT in your research, please cite:
 
-C.Sarat. (2026).
-SWIFT: Automated Retrieval of Hydrological Station Data
-from India‑WRIS and CWC Portals.
+Sarat, C., Dash, D., & Kumar, A. (2026).
+SWIFT: Automated Retrieval of Hydrological Station Data from India‑WRIS and CWC Portals.
 Journal of Open Source Software.
 
 ------------------------------------------------------------
