@@ -4,7 +4,7 @@
 
 ## Simple Water Information Fetch Tool
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Data](https://img.shields.io/badge/data-WRIS%20India-blue) ![Field](https://img.shields.io/badge/field-hydrology-lightblue)
+![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.9%2B-blue) ![Data](https://img.shields.io/badge/data-Hydrological%20Data-blue) ![Field](https://img.shields.io/badge/field-hydrology-lightblue)
 
 ---
 
