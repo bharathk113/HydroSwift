@@ -181,6 +181,21 @@ def main() -> int:
 
     if args.cwc or args.cwc_station:
         return run_cwc_download(args)
+    
+    # Citation
+    if args.cite:
+        print("""
+        If you use SWIFT in your research, please consider citing:
+
+        Sarat, C., Dash, D., & Kumar, A. (2026).
+        SWIFT: Automated Retrieval of Hydrological Station Data
+        from India-WRIS and CWC Portals.
+        Journal of Open Source Software.
+
+        Repository:
+        https://github.com/carbform/swift
+        """)
+        return 0
 
     # ---------------------------------------------------------
     # Default WRIS download

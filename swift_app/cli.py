@@ -66,6 +66,14 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
+    from . import VERSION
+
+    parser.add_argument(
+    "--version",
+    action="version",
+    version=f"SWIFT {VERSION}",
+        )
+
     basin_help = "River basin name or corresponding number:\n"
     for num, name in WRIS_BASINS.items():
         basin_help += f"  [{num}] {name}\n"
@@ -76,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--basin",
         help=basin_help,
     )
+    parser.add_argument(
+    "--cite",
+    action="store_true",
+    help="Show citation information for SWIFT",
+    )
+
 
     datasets = parser.add_argument_group(
     "Datasets (WRIS or CWC depending on --cwc)")

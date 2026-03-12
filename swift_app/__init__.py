@@ -15,3 +15,4 @@ APP_ORG = "Carbform • carbform.github.io"
 
 VERSION = f"{__version__}"
 VERSION_FULL = f"{VERSION} — {__codename__}"
+from .api_public import run

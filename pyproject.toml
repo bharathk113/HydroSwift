@@ -1,3 +1,5 @@
+[tool.setuptools]
+packages = ["swift_app"]
 [project]
 name = "swift-wris"
 version = "1.0.0"

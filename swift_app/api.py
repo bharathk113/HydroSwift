@@ -8,7 +8,8 @@ import time
 import requests
 import urllib3
 
-urllib3.disable_warnings()
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 BASE = "https://indiawris.gov.in"
@@ -36,7 +37,9 @@ class WrisClient:
     def __init__(self, delay: float = 0.25):
         self.delay = delay
         self.session = requests.Session()
-        # WRIS uses a broken SSL chain, so we disable verification
+        # WRIS uses a broken SSL chain, so we disabled verification; also 
+        # when using a proxy or VPN, 
+        # the cert may not be valid for the client system.
         self.session.verify = False
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0",
