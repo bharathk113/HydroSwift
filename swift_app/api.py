@@ -31,7 +31,9 @@ HEADERS = {
 }
 
 
-class WrisClient:
+from .base_client import BaseHydrologyClient
+
+class WrisClient(BaseHydrologyClient):
     """Thin API client for WRIS browser endpoints."""
 
     def __init__(self, delay: float = 0.25):

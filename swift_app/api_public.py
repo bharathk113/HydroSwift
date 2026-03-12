@@ -44,7 +44,14 @@ def _normalize_datasets_input(datasets):
 
     return list(datasets)
 
-
+def _normalize_cwc_station_input(cwc_station):
+    if cwc_station is None:
+        return None
+    
+    if isinstance(cwc_station, str) or isinstance(cwc_station, int):
+        return [str(cwc_station)]
+        
+    return [str(x) for x in cwc_station]
 
 # ---------------------------------------------------------
 # Normalize dataset input
@@ -163,6 +170,8 @@ def download(
     # basin shorthand
     if basin is None and b is not None:
         basin = b
+
+    cwc_station = _normalize_cwc_station_input(cwc_station)
 
     args = _build_args(
         basin=basin,
@@ -373,6 +382,17 @@ def search_stations(basin, dataset="discharge", delay=0.25):
 
     print(f"\nFound {len(df)} stations in basin '{basin}' for dataset '{dataset}'")
 
+    return df
+
+def cwc_stations():
+    """
+    Returns a pandas DataFrame of available CWC flood forecasting stations.
+    """
+    from .cwc import load_station_table
+    
+    df = load_station_table()
+    print(f"\nFound {len(df)} CWC flood forecasting stations")
+    
     return df
 
 ### Classes for notebook completion  and list printing functions

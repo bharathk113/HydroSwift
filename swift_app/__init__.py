@@ -23,6 +23,8 @@ from .api_public import (
     datasets,
     basins,
     search_stations,
+    cwc_stations,
     cite,
     coffee,
 )
+from .base_client import BaseHydrologyClient
