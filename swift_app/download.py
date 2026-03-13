@@ -70,6 +70,34 @@ except Exception:
     def tqdm(iterable, **_kwargs):
         return iterable
 
+# ---------------------------------------------------------
+# Metadata builder (WRIS + CWC compatible)
+# ---------------------------------------------------------
+def build_metadata(meta, dataset, source):
+
+    md = {
+        "source": source,
+        "dataset": dataset,
+        "station_code": meta.get("station_code"),
+        "station_name": meta.get("station_Name") or meta.get("station_name"),
+        "latitude": meta.get("latitude") or meta.get("lat"),
+        "longitude": meta.get("longitude") or meta.get("lon"),
+        "river": meta.get("riverName") or meta.get("river"),
+    }
+
+    if source == "WRIS":
+        md["agency"] = meta.get("agencyName")
+
+    if source == "CWC":
+        md["rl_zero"] = meta.get("rl_zero")
+        md["warning_level"] = meta.get("warning_level")
+        md["danger_level"] = meta.get("danger_level")
+        md["hfl"] = meta.get("hfl")
+
+    return md
+
+
+
 
 # ---------------------------------------------------------
 # Save station timeseries
@@ -90,6 +118,11 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_
         return None
 
     df = df.copy()
+
+    # ---------------------------------------------------------
+    # Standardize dataframe
+    # ---------------------------------------------------------
+
     df["station_code"] = station
     df["time"] = pd.to_datetime(df["time"], errors="coerce")
     df = df.dropna(subset=["time"])
@@ -104,10 +137,47 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_
     cols = [c for c in cols if c in df.columns]
     df = df[cols]
 
+    # ---------------------------------------------------------
+    # Determine source and build metadata
+    # ---------------------------------------------------------
+
+    source = "CWC" if getattr(args, "cwc", False) else "WRIS"
+
+    meta_dict = build_metadata(meta, dataset, source)
+
+    meta_dict["station_code"] = station
+
+    # ---------------------------------------------------------
+    # CSV Output
+    # ---------------------------------------------------------
+
     if args.format == "csv":
-        df.to_csv(output_path, index=False)
+
+        header_lines = ["# SWIFT Hydrological Timeseries"]
+
+        for key, value in meta_dict.items():
+            if value is not None and value != "":
+                header_lines.append(f"# {key}: {value}")
+
+        with open(output_path, "w") as f:
+            for line in header_lines:
+                f.write(line + "\n")
+
+        df.to_csv(output_path, mode="a", index=False)
+
+    # ---------------------------------------------------------
+    # Excel Output
+    # ---------------------------------------------------------
+
     else:
-        df.to_excel(output_path, index=False)
+
+        meta_df = pd.DataFrame(
+            [{"field": k, "value": v} for k, v in meta_dict.items() if v is not None]
+        )
+
+        with pd.ExcelWriter(output_path) as writer:
+            df.to_excel(writer, sheet_name="timeseries", index=False)
+            meta_df.to_excel(writer, sheet_name="metadata", index=False)
 
     return output_path
 

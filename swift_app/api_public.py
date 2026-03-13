@@ -332,6 +332,30 @@ def plot(input_dir, datasets=None, output_dir=None, cwc=False):
 
 import pandas as pd
 
+class SwiftTable(pd.DataFrame):
+    """
+    Lightweight DataFrame wrapper for SWIFT tables.
+    Behaves exactly like pandas but prints a helpful header in notebooks.
+    """
+
+    @property
+    def _constructor(self):
+        return SwiftTable
+
+    def __repr__(self):
+
+        rows, cols = self.shape
+
+        header = (
+            f"SWIFT Table\n"
+            f"Rows: {rows:,} | Columns: {cols}\n"
+            f"{'-'*40}\n"
+        )
+
+        return header + super().__repr__()
+
+
+
 
 def search_stations(basin, dataset="discharge", delay=0.25):
     """
@@ -391,20 +415,56 @@ def search_stations(basin, dataset="discharge", delay=0.25):
 
     df = pd.DataFrame(records)
 
-    print(f"\nFound {len(df)} stations in basin '{basin}' for dataset '{dataset}'")
+    df = df.sort_values("station_code").reset_index(drop=True)
 
-    return df
+    return SwiftTable(df.copy())
 
-def cwc_stations():
+def cwc_stations(list=False, metadata=False, station_id=None):
     """
-    Returns a pandas DataFrame of available CWC flood forecasting stations.
+    Query CWC flood forecasting stations.
+
+    Returns
+    -------
+    pandas.DataFrame or SwiftTable
+        If `list=True`, returns a table of station codes and names.
+        If `metadata=True` and `station_id` is None, returns full metadata for all stations.
+        If `metadata=True` and `station_id` is provided, returns metadata for the specified station.
+        By default, returns full metadata for all stations as a SwiftTable.
     """
+
     from .cwc import load_station_table
-    
-    df = load_station_table()
-    print(f"\nFound {len(df)} CWC flood forecasting stations")
-    
-    return df
+
+    df = load_station_table().sort_values("code")
+
+    if df is None or df.empty:
+        return SwiftTable(pd.DataFrame())
+
+    # ---------------------------------------------------------
+    # Station list
+    # ---------------------------------------------------------
+
+    if list:
+        return SwiftTable(df[["code", "name"]].copy())
+
+    # ---------------------------------------------------------
+    # Full metadata
+    # ---------------------------------------------------------
+
+    if metadata and station_id is None:
+        return SwiftTable(df.copy())
+
+    # ---------------------------------------------------------
+    # Single station metadata
+    # ---------------------------------------------------------
+
+    if station_id and metadata:
+        return SwiftTable(df[df["code"] == station_id].copy())
+
+    # ---------------------------------------------------------
+    # Default behaviour
+    # ---------------------------------------------------------
+
+    return SwiftTable(df.copy())
 
 ### Classes for notebook completion  and list printing functions
 class _DatasetNamespace:
@@ -455,17 +515,9 @@ class _BasinNamespace:
     def __call__(self):
         """Print clean basin table and return mapping."""
 
-        print("\nAvailable WRIS Basins")
-        print("--------------------------------------------")
-        print(f"{'ID':<6}{'Basin'}")
-        print("--------------------------------------------")
 
-        for code, name in sorted(self._mapping.items(), key=lambda x: int(x[0])):
-            print(f"{code:<6}{name}")
-
-        print("--------------------------------------------")
-
-        return self._mapping
+        records = [{"id": k, "basin": v} for k, v in self._mapping.items()]
+        return SwiftTable(pd.DataFrame(records))
 
 basins = _BasinNamespace(WRIS_BASINS)
 

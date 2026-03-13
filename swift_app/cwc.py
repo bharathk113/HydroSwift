@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import pandas as pd
 import requests
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ---------------------------------------------------------
 # HTTP session (connection reuse)
@@ -16,62 +16,128 @@ from concurrent.futures import ThreadPoolExecutor
 
 session = requests.Session()
 
+adapter = requests.adapters.HTTPAdapter(
+    pool_connections=40,
+    pool_maxsize=40,
+)
+
+session.mount("https://", adapter)
+
 CWC_API = "https://ffs.india-water.gov.in/iam/api/new-entry-data/specification/sorted"
 
 
 # ---------------------------------------------------------
 # Load station table
 # ---------------------------------------------------------
-
 def load_station_table():
 
+    import time
+
+    cache_dir = Path.home() / ".swift_cache"
+    cache_file = cache_dir / "cwc_stations.csv"
+
+    cache_dir.mkdir(exist_ok=True)
+
+    # ---------------------------------------------------------
+    # Use cache if fresh (<24 hours)
+    # ---------------------------------------------------------
+
+    if cache_file.exists():
+
+        age = time.time() - cache_file.stat().st_mtime
+
+        if age < 86400:  # 24 hours
+            try:
+                df = pd.read_csv(cache_file)
+                if not df.empty:
+                    return df
+                print("Using cached CWC station metadata")
+            except Exception:
+                pass
+
+    # ---------------------------------------------------------
+    # Fetch from API
+    # ---------------------------------------------------------
+
+    try:
+
+        df = fetch_cwc_station_metadata()
+        print("Fetching CWC station metadata from API")
+
+        if not df.empty:
+            df.to_csv(cache_file, index=False)
+            return df
+
+
+    except Exception:
+        pass
+
+    # ---------------------------------------------------------
+    # Fallback to packaged CSV
+    # ---------------------------------------------------------
+
     station_file = Path(__file__).parent / "cwc_stations.csv"
-    location_file = Path(__file__).parent / "station_locations.csv"
 
-    if not station_file.exists():
-        raise RuntimeError("CWC station file missing")
+    if station_file.exists():
+        df = pd.read_csv(station_file)
+        df.columns = [c.lower().strip() for c in df.columns]
+        return df
 
-    df = pd.read_csv(station_file)
-    df.columns = [c.lower().strip() for c in df.columns]
+    raise RuntimeError("Unable to retrieve CWC station metadata")
 
-    # ---------------------------------------------------------
-    # Load station locations if available
-    # ---------------------------------------------------------
+# Get metadata for all stations
 
-    if location_file.exists():
+def fetch_cwc_station_metadata():
 
-        loc = pd.read_csv(location_file)
-        loc.columns = [c.lower().strip() for c in loc.columns]
+    base_url = "https://ffs.india-water.gov.in/iam/api/station"
 
-        # normalize names for matching
-        df["name"] = (
-            df["name"]
-            .astype(str)
-            .str.lower()
-            .str.replace(r"\(.*?\)", "", regex=True)
-            .str.strip()
-        )
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-        loc["name"] = (
-            loc["name"]
-            .astype(str)
-            .str.lower()
-            .str.replace(r"\(.*?\)", "", regex=True)
-            .str.strip()
-        )
+    def fetch_page(page):
 
-        # merge coordinates
-        df = df.merge(
-            loc[["name", "lat", "lon"]],
-            on="name",
-            how="left"
-        )
+        params = {"page": page, "size": 100}
 
-    else:
-        print("Warning: station_locations.csv not found; Skipping lat/lon entries.")
+        for _ in range(3):
+            try:
+                r = session.get(base_url, params=params, headers=headers, timeout=60)
+                if r.status_code == 200:
+                    return r.json()
+            except Exception:
+                pass
 
-    return df
+        return []
 
+
+    rows = []
+
+    pages = range(0, 20)   # adjust if needed
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+
+        results = executor.map(fetch_page, pages)
+
+    for page_data in results:
+
+        if not page_data:
+            break
+
+        for s in page_data:
+
+                rows.append({
+                    "code": s.get("stationCode"),
+                    "name": s.get("stationName"),
+                    "river": s.get("river"),
+                    "basin": s.get("basin"),
+                    "lat": s.get("latitude"),
+                    "lon": s.get("longitude"),
+                    "rl_zero": s.get("rl"),
+                    "warning_level": s.get("warningLevel"),
+                    "danger_level": s.get("dangerLevel"),
+                    "hfl": s.get("hfl"),
+                    "hfl_date": s.get("hflDate"),
+                })
+
+    return pd.DataFrame(rows)
 
 # ---------------------------------------------------------
 # Fetch CWC station data
@@ -204,6 +270,14 @@ def download_station(station, output_dir, args):
 
     if df.empty:
         return False
+    
+    rl = station.get("rl_zero")
+
+    if rl is not None:
+        try:
+            df["water_depth"] = df["wse"] - float(rl)
+        except Exception:
+            pass    
 
     # ---------------------------------------------------------
     # Attach station metadata
@@ -214,7 +288,28 @@ def download_station(station, output_dir, args):
     df["lat"] = lat
     df["lon"] = lon
 
-    cols = ["station_code", "time", "wse", "unit", "lat", "lon"]
+    # Optional metadata
+    for field in [
+        "river",
+        "basin",
+        "rl_zero",
+        "warning_level",
+        "danger_level",
+        "hfl",
+        "hfl_date",
+    ]:
+        if field in station:
+            df[field] = station.get(field)
+
+    cols = [
+        "station_code",
+        "time",
+        "wse",
+        "water_depth",
+        "unit",
+        "lat",
+        "lon",
+    ]
     df = df[[c for c in cols if c in df.columns]]
 
     # ---------------------------------------------------------
@@ -321,7 +416,7 @@ def run_cwc_download(args):
         logger.log("INFO", f"Skipped {skipped} existing stations")
 
     downloaded = 0
-    workers = min(8, (os.cpu_count() or 1) * 2)
+    workers = min(32, max(8, (os.cpu_count() or 1) * 4))
 
     # ---------------------------------------------------------
     # Parallel downloads
@@ -338,24 +433,24 @@ def run_cwc_download(args):
 
             futures = [executor.submit(_worker, item) for item in station_list]
 
-            for f in tqdm_mod(
-                futures,
-                total=len(futures),
-                desc="water_level",
-                unit="station",
-                leave=True,
-                dynamic_ncols=True,
-                disable=Console.is_quiet
-            ):
-                try:
-                    result, stcode = f.result()
-                    if result is True:
-                        downloaded += 1
-                        logger.log("SUCCESS", f"Downloaded {stcode}")
-                    elif result is False or result is None:
-                        logger.log("WARN", f"Failed or empty data for {stcode}")
-                except Exception as e:
-                    logger.log("ERROR", f"Worker crash: {str(e)}")
+        for f in tqdm_mod(
+            as_completed(futures),
+            total=len(futures),
+            desc="water_level",
+            unit="station",
+            leave=True,
+            dynamic_ncols=True,
+            disable=Console.is_quiet
+        ):
+            try:
+                result, stcode = f.result()
+                if result is True:
+                    downloaded += 1
+                    logger.log("SUCCESS", f"Downloaded {stcode}")
+                elif result is False or result is None:
+                    logger.log("WARN", f"Failed or empty data for {stcode}")
+            except Exception as e:
+                logger.log("ERROR", f"Worker crash: {str(e)}")
 
     else:
         Console.info("All stations already downloaded \u2014 skipping download step.")

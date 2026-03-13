@@ -20,10 +20,10 @@ from .api_public import (
     download,
     merge,
     plot,
-    datasets,
-    basins,
     search_stations,
     cwc_stations,
+    basins,
+    datasets,
     cite,
     coffee,
 )
