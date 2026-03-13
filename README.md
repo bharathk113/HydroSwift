@@ -80,11 +80,19 @@ swift_app.download(
 # 3. Download an entire WRIS basin silently
 swift_app.download(
     basin="Krishna", 
-    dataset_flags=["q"], 
+    datasets=["discharge"],
     merge=True, 
     quiet=True
 )
+
+# Supported Python dataset names:
+# discharge, water_level, atm_pressure, rainfall,
+# temperature, humidity, solar_radiation,
+# sediment, groundwater_level
 ```
+
+> Note: `dataset_flags=["q", "rf", ...]` is still accepted for backwards compatibility,
+> but `datasets=["discharge", "rainfall", ...]` is preferred for readability.
 
 ------------------------------------------------------------
 
