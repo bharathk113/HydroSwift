@@ -26,12 +26,16 @@ from .cwc import run_cwc_download
 DATASET_ALIAS = {
     "discharge": "q",
     "water_level": "wl",
+    "atm_pressure": "atm",
+    "atmospheric_pressure": "atm",
     "rainfall": "rf",
     "temperature": "temp",
     "humidity": "rh",
     "solar": "solar",
+    "solar_radiation": "solar",
     "sediment": "sed",
     "groundwater": "gwl",
+    "groundwater_level": "gwl",
 }
 
 def _normalize_datasets_input(datasets):
@@ -73,7 +77,10 @@ def _normalize_dataset_flags(datasets):
             flags.append(d)
 
         else:
-            raise ValueError(f"Unknown dataset: {d}")
+            valid = sorted(DATASET_ALIAS.keys()) + sorted(DATASET_ALIAS.values())
+            raise ValueError(
+                f"Unknown dataset: {d}. Supported values: {', '.join(valid)}"
+            )
 
     return flags
 
@@ -141,6 +148,7 @@ def download(
     quiet=False,
     cwc=False,
     cwc_station=None,
+    dataset_flags=None,
 ):
 
     if output_dir is None:
@@ -149,6 +157,9 @@ def download(
     output_dir = str(Path(output_dir))
 
     # normalize dataset input
+    if datasets is None and dataset_flags is not None:
+        datasets = dataset_flags
+
     datasets = _normalize_datasets_input(datasets)
 
     if not datasets and not cwc:
@@ -499,4 +510,3 @@ def coffee():
         )
 
     return None
-
