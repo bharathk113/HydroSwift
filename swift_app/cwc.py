@@ -89,75 +89,120 @@ def load_station_table():
 
 def fetch_cwc_station_metadata():
 
-    base_url = "https://ffs.india-water.gov.in/iam/api/station"
+    base = "https://ffs.india-water.gov.in/iam/api/layer-station"
 
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    def fetch_page(page):
+    # ------------------------------------------------
+    # Step 1 — get station codes
+    # ------------------------------------------------
 
-        params = {"page": page, "size": 100}
+    url = f"{base}/specification/sorted-page"
 
-        for _ in range(3):
-            try:
-                r = session.get(base_url, params=params, headers=headers, timeout=60)
-                if r.status_code == 200:
-                    return r.json()
-            except Exception:
-                pass
+    params = {
+        "sort-criteria": "%7B%22sortOrderDtos%22:%5B%7B%22sortDirection%22:%22ASC%22,%22field%22:%22name%22%7D%5D%7D",
+        "page-number": 0,
+        "page-size": 2000,
+        "specification": "%7B%22unique%22:true%7D"
+    }
 
-        return []
+    r = session.get(url, params=params, headers=headers, timeout=120)
 
+    if r.status_code != 200:
+        raise RuntimeError("Failed to fetch station list")
+
+    stations = r.json()
+
+    codes = [s.get("stationCode") for s in stations if s.get("stationCode")]
+
+    # ------------------------------------------------
+    # Step 2 — fetch metadata per station
+    # ------------------------------------------------
 
     rows = []
 
-    pages = range(0, 20)   # adjust if needed
+    def fetch_station(code):
 
-    with ThreadPoolExecutor(max_workers=6) as executor:
+        try:
 
-        results = executor.map(fetch_page, pages)
+            r = session.get(f"{base}/{code}", headers=headers, timeout=60)
 
-    for page_data in results:
+            if r.status_code != 200:
+                return None
 
-        if not page_data:
-            break
+            s = r.json()
 
-        for s in page_data:
+            ff = s.get("floodForecastStaticStationCode") or {}
 
-                rows.append({
-                    "code": s.get("stationCode"),
-                    "name": s.get("stationName"),
-                    "river": s.get("river"),
-                    "basin": s.get("basin"),
-                    "lat": s.get("latitude"),
-                    "lon": s.get("longitude"),
-                    "rl_zero": s.get("rl"),
-                    "warning_level": s.get("warningLevel"),
-                    "danger_level": s.get("dangerLevel"),
-                    "hfl": s.get("hfl"),
-                    "hfl_date": s.get("hflDate"),
-                })
+            return {
+                "code": s.get("stationCode"),
+                "name": s.get("name"),
 
-    return pd.DataFrame(rows)
+                "river": (s.get("river") or {}).get("name"),
+                "basin": (s.get("basin") or {}).get("name"),
+
+                "state": (s.get("stateCode") or {}).get("name"),
+                "district": (s.get("districtId") or {}).get("name"),
+
+                "lat": s.get("lat"),
+                "lon": s.get("lon"),
+
+                "rl_zero": s.get("reducedLevelOfZeroGauge"),
+
+                "warning_level": ff.get("warningLevel"),
+                "danger_level": ff.get("dangerLevel"),
+                "hfl": ff.get("highestFlowLevel"),
+                "hfl_date": ff.get("highestFlowLevelDate"),
+            }
+
+        except Exception:
+            return None
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+
+        results = executor.map(fetch_station, codes)
+
+    for r in results:
+        if r:
+            rows.append(r)
+
+    df = pd.DataFrame(rows)
+
+    df = df.sort_values("code").reset_index(drop=True)
+
+    return df
 
 # ---------------------------------------------------------
 # Fetch CWC station data
 # ---------------------------------------------------------
 
-def fetch_station_data(code, retries=3):
+def fetch_station_data(code, start_date=None, end_date=None, retries=3):
 
     import time
-    
+
+    start = start_date or "1950-01-01"
+    end = end_date or "2100-01-01"
+
     params = {
         "sort-criteria": "%7B%22sortOrderDtos%22:%5B%7B%22sortDirection%22:%22ASC%22,%22field%22:%22id.dataTime%22%7D%5D%7D",
+
         "specification": (
-            "%7B%22where%22:%7B%22expression%22:%7B"
-            f"%22fieldName%22:%22id.stationCode%22,%22operator%22:%22eq%22,%22value%22:%22{code}%22"
+            "%7B%22where%22:%7B%22where%22:%7B%22where%22:%7B%22expression%22:%7B"
+            f"%22valueIsRelationField%22:false,%22fieldName%22:%22id.stationCode%22,%22operator%22:%22eq%22,%22value%22:%22{code}%22"
+            "%7D%7D,%22and%22:%7B%22expression%22:%7B"
+            "%22valueIsRelationField%22:false,%22fieldName%22:%22id.datatypeCode%22,%22operator%22:%22eq%22,%22value%22:%22HHS%22"
+            "%7D%7D%7D,%22and%22:%7B%22expression%22:%7B"
+            "%22valueIsRelationField%22:false,%22fieldName%22:%22dataValue%22,%22operator%22:%22null%22,%22value%22:%22false%22"
+            "%7D%7D%7D,%22and%22:%7B%22expression%22:%7B"
+            f"%22valueIsRelationField%22:false,%22fieldName%22:%22id.dataTime%22,%22operator%22:%22btn%22,%22value%22:%22{start}T00:00:00,{end}T00:00:00%22"
             "%7D%7D%7D"
         )
     }
 
     headers = {"User-Agent": "Mozilla/5.0"}
-    
+
     delays = [5, 10, 20]
 
     for attempt in range(retries):
@@ -172,35 +217,82 @@ def fetch_station_data(code, retries=3):
             )
 
             if r.status_code == 200:
+
                 data = r.json()
 
-                if isinstance(data, list):
-                    rows = []
+                rows = []
 
-                    for j in data:
-                        try:
-                            rows.append([
-                                j["stationCode"],
-                                j["id"]["dataTime"],
-                                j["dataValue"]
-                            ])
-                        except Exception:
-                            pass
+                for j in data:
+                    try:
+                        rows.append([
+                            j["stationCode"],
+                            j["id"]["dataTime"],
+                            j["dataValue"]
+                        ])
+                    except Exception:
+                        pass
 
-                    if rows:
-                        df = pd.DataFrame(rows, columns=["station_code", "time", "wse"])
-                        df["time"] = pd.to_datetime(df["time"])
-                        return df
+                if rows:
+                    df = pd.DataFrame(rows, columns=["station_code", "time", "wse"])
+                    df["time"] = pd.to_datetime(df["time"])
+                    return df
 
         except Exception:
             pass
-            
+
         if attempt < retries - 1:
             time.sleep(delays[attempt])
 
     return None
 
+def get_cwc_station_metadata(query=None, basin=None, river=None):
+    """
+    Return metadata for CWC stations.
 
+    Parameters
+    ----------
+    query : str
+        Partial station code or name.
+    basin : str
+        Basin name filter.
+    river : str
+        River name filter.
+    """
+
+    stations = load_station_table()
+
+    df = stations.copy()
+
+    # ---------------------------------------------------------
+    # Basin filter
+    # ---------------------------------------------------------
+
+    if basin:
+        df = df[df["basin"].str.lower().str.contains(basin.lower(), na=False)]
+
+    # ---------------------------------------------------------
+    # River filter
+    # ---------------------------------------------------------
+
+    if river:
+        df = df[df["river"].str.lower().str.contains(river.lower(), na=False)]
+
+    # ---------------------------------------------------------
+    # Code / name search
+    # ---------------------------------------------------------
+
+    if query:
+        q = str(query).lower()
+
+        df = df[
+            df["code"].str.lower().str.contains(q)
+            | df["name"].str.lower().str.contains(q)
+        ]
+
+    if df.empty:
+        raise ValueError("No matching CWC stations found")
+
+    return df.sort_values("code").reset_index(drop=True)
 # ---------------------------------------------------------
 # Worker function for parallel downloads
 # ---------------------------------------------------------
@@ -239,7 +331,11 @@ def download_station(station, output_dir, args):
     # Fetch data
     # ---------------------------------------------------------
 
-    df = fetch_station_data(code)
+    df = fetch_station_data(
+    code,
+    start_date=args.start_date,
+    end_date=args.end_date
+    )
 
     if df is None or df.empty:
         return False
@@ -251,22 +347,6 @@ def download_station(station, output_dir, args):
     df["time"] = pd.to_datetime(df["time"], errors="coerce")
     df = df.dropna(subset=["time"])
 
-    # ---------------------------------------------------------
-    # Date filtering
-    # ---------------------------------------------------------
-
-    try:
-
-        if args.start_date:
-            start = pd.to_datetime(args.start_date)
-            df = df[df["time"] >= start]
-
-        if args.end_date:
-            end = pd.to_datetime(args.end_date)
-            df = df[df["time"] <= end]
-
-    except Exception:
-        pass
 
     if df.empty:
         return False

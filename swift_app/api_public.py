@@ -11,12 +11,14 @@ from types import SimpleNamespace
 from pathlib import Path
 import time
 
+
 from .api import WrisClient
 from .cli import DATASETS, WRIS_BASINS
 from .download import run_download
 from .merge import run_merge_only
 from .plot import run_plot_only
 from .cwc import run_cwc_download
+from .cwc import get_cwc_station_metadata
 
 
 # ---------------------------------------------------------
@@ -57,6 +59,17 @@ def _normalize_cwc_station_input(cwc_station):
         
     return [str(x) for x in cwc_station]
 
+def cwc_station(query=None, basin=None, river=None):
+    """
+    Return metadata for CWC station(s).
+
+    Examples
+    --------
+    swift.cwc_station("surat")
+    swift.cwc_station(basin="godavari")
+    swift.cwc_station(river="krishna")
+    """
+    return get_cwc_station_metadata(query=query, basin=basin, river=river)
 # ---------------------------------------------------------
 # Normalize dataset input
 # ---------------------------------------------------------

@@ -21,10 +21,10 @@ from .api_public import (
     merge,
     plot,
     search_stations,
-    cwc_stations,
     basins,
     datasets,
     cite,
     coffee,
+    cwc_station
 )
 from .base_client import BaseHydrologyClient
