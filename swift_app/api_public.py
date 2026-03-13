@@ -384,6 +384,62 @@ def search_stations(basin, dataset="discharge", delay=0.25):
 
     basin_structure = build_basin_structure(client, basin_code)
 
+    # Build a lightweight station -> river/tributary fallback map using
+    # station discovery endpoints (metadata often misses riverName).
+    station_river_fallback = {}
+
+    try:
+        tributaries = client.get_tributaries(basin_code, dataset_code)
+
+        for trib in tributaries:
+            trib_id = trib.get("tributaryid")
+            trib_name = (
+                trib.get("tributary")
+                or trib.get("tributaryName")
+                or trib.get("tributaryname")
+            )
+
+            rivers = client.get_rivers(trib_id, dataset_code)
+
+            for river in rivers:
+                river_id = river.get("localriverid")
+                river_name = (
+                    river.get("riverName")
+                    or river.get("localriver")
+                    or river.get("localRiver")
+                    or river.get("localrivername")
+                    or river.get("river")
+                )
+
+                agencies = client.get_agencies(trib_id, river_id, dataset_code)
+
+                for agency in agencies:
+                    agency_id = agency.get("agencyid")
+                    stations_items = client.get_stations(
+                        trib_id,
+                        river_id,
+                        agency_id,
+                        dataset_code,
+                    )
+
+                    for s in stations_items:
+                        code = s.get("stationcode")
+                        if not code:
+                            continue
+
+                        label = (
+                            river_name
+                            or s.get("riverName")
+                            or s.get("river")
+                            or trib_name
+                        )
+
+                        if label and code not in station_river_fallback:
+                            station_river_fallback[code] = label
+    except Exception:
+        # Discovery fallback is best-effort; continue gracefully.
+        pass
+
     agency_cache = {}
     station_cache = {}
 
@@ -409,7 +465,11 @@ def search_stations(basin, dataset="discharge", delay=0.25):
             "station_name": meta.get("station_Name"),
             "latitude": meta.get("latitude"),
             "longitude": meta.get("longitude"),
-            "river": meta.get("riverName"),
+            "river": (
+                meta.get("riverName")
+                or meta.get("river")
+                or station_river_fallback.get(s)
+            ),
         })
 
     df = pd.DataFrame(records)
@@ -418,7 +478,7 @@ def search_stations(basin, dataset="discharge", delay=0.25):
 
     return SwiftTable(df.copy())
 
-def cwc_stations(list=False, metadata=False, station_id=None):
+def cwc_stations(list=False, metadata=False, station_id=None, refresh=False):
     """
     Query CWC flood forecasting stations.
 
@@ -431,9 +491,29 @@ def cwc_stations(list=False, metadata=False, station_id=None):
         By default, returns full metadata for all stations as a SwiftTable.
     """
 
-    from .cwc import load_station_table
+    from .cwc import load_station_table, fetch_cwc_station_metadata
 
-    df = load_station_table().sort_values("code")
+    if refresh:
+        df = fetch_cwc_station_metadata()
+
+        if df is None or df.empty:
+            # Network/proxy failures are common in restricted environments.
+            # Fall back to cached/packaged station table so notebook flows
+            # remain usable.
+            print("Warning: live CWC station refresh failed; using cached/packaged station table.")
+            df = load_station_table()
+        else:
+            # Persist a refreshed cache for subsequent calls.
+            try:
+                cache_dir = Path.home() / ".swift_cache"
+                cache_dir.mkdir(exist_ok=True)
+                (cache_dir / "cwc_stations.csv").write_text(df.to_csv(index=False))
+            except Exception:
+                pass
+    else:
+        df = load_station_table()
+
+    df = df.sort_values("code")
 
     if df is None or df.empty:
         return SwiftTable(pd.DataFrame())
