@@ -114,6 +114,17 @@ def main() -> int:
         print("\nAvailable WRIS Basins:")
         for num, name in WRIS_BASINS.items():
             print(f"  [{num}] {name}")
+
+        print("\nCWC Stations:")
+        try:
+            from .cwc import load_station_table
+
+            stations = load_station_table()
+            count = 0 if stations is None else len(stations)
+            print(f"  Total known stations: {count}")
+            print("  Tip: use --cwc-station <CODE1 CODE2 ...> to download selected stations")
+        except Exception:
+            print("  Unable to load CWC station metadata right now.")
         return 0
 
     # ---------------------------------------------------------

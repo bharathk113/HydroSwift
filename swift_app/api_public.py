@@ -142,7 +142,7 @@ def download(
     merge=False,
     plot=False,
     metadata=False,
-    output_dir=None,
+    output_dir="output",
     delay=0.25,
     format="csv",
     quiet=False,
@@ -151,8 +151,9 @@ def download(
     dataset_flags=None,
 ):
 
-    if output_dir is None:
-        raise ValueError("output_dir must be specified when using the Python API")
+    # CLI parity: if cwc_station is provided, activate CWC mode implicitly.
+    if cwc_station is not None:
+        cwc = True
 
     output_dir = str(Path(output_dir))
 
@@ -167,16 +168,14 @@ def download(
 
     dataset_flags = _normalize_dataset_flags(datasets)
 
+    if format not in {"csv", "xlsx"}:
+        raise ValueError("format must be one of: csv, xlsx")
+
     # ---------------------------------------------------------
     # Output directory required
     # ---------------------------------------------------------
     if basin is None and not cwc:
         raise ValueError("basin must be specified unless using cwc=True")
-
-    if output_dir is None:
-        raise ValueError("output_dir must be specified when using the Python API")
-
-    output_dir = str(Path(output_dir))
 
     # basin shorthand
     if basin is None and b is not None:
@@ -472,23 +471,29 @@ class _DatasetNamespace:
 
     discharge = "discharge"
     water_level = "water_level"
+    atm_pressure = "atm_pressure"
     rainfall = "rainfall"
     temperature = "temperature"
     humidity = "humidity"
     solar = "solar"
+    solar_radiation = "solar_radiation"
     sediment = "sediment"
     groundwater = "groundwater"
+    groundwater_level = "groundwater_level"
 
     def __call__(self):
         return [
             self.discharge,
             self.water_level,
+            self.atm_pressure,
             self.rainfall,
             self.temperature,
             self.humidity,
             self.solar,
+            self.solar_radiation,
             self.sediment,
             self.groundwater,
+            self.groundwater_level,
         ]
 
 

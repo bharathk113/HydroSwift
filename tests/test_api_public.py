@@ -49,3 +49,53 @@ def test_download_supports_legacy_dataset_flags_kwarg(monkeypatch, tmp_path):
 def test_unknown_dataset_error_is_actionable():
     with pytest.raises(ValueError, match="Supported values"):
         _normalize_dataset_flags(["bogus_dataset"])
+
+
+def test_download_allows_cwc_station_without_cwc_flag(monkeypatch):
+    import swift_app.api_public as api_public
+
+    calls = {}
+
+    def fake_run_cwc_download(args):
+        calls["cwc"] = args.cwc
+        calls["stations"] = args.cwc_station
+
+    monkeypatch.setattr(api_public, "run_cwc_download", fake_run_cwc_download)
+
+    api_public.download(
+        cwc_station=["040-CDJAPR"],
+        quiet=True,
+    )
+
+    assert calls["cwc"] is True
+    assert calls["stations"] == ["040-CDJAPR"]
+
+
+def test_download_defaults_output_dir_to_output(monkeypatch):
+    import swift_app.api_public as api_public
+
+    class DummyClient:
+        def __init__(self, delay=0.25):
+            self.delay = delay
+
+        def check_api(self):
+            return True
+
+        def get_basin_code(self, basin):
+            return "6"
+
+    calls = {}
+
+    def fake_run_download(args, selected, client, basin_code):
+        calls["output_dir"] = args.output_dir
+
+    monkeypatch.setattr(api_public, "WrisClient", DummyClient)
+    monkeypatch.setattr(api_public, "run_download", fake_run_download)
+
+    api_public.download(
+        basin="Krishna",
+        datasets=["discharge"],
+        quiet=True,
+    )
+
+    assert calls["output_dir"].endswith("output")

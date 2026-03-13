@@ -70,7 +70,6 @@ cwc_stations = swift_app.cwc_stations()
 
 # 2. Download specific CWC stations
 swift_app.download(
-    cwc=True, 
     cwc_station=["040-CDJAPR", "038-CDJAPR"], 
     start_date="2010-01-01", 
     format="xlsx",
@@ -84,6 +83,9 @@ swift_app.download(
     merge=True, 
     quiet=True
 )
+
+# Optional: output_dir defaults to "output"
+# swift_app.download(..., output_dir="output")
 
 # Supported Python dataset names:
 # discharge, water_level, atm_pressure, rainfall,
@@ -126,11 +128,15 @@ Merge downloaded station datasets into a GeoPackage:
 
 Generate time series plots from downloaded data:
 
-    swift --plot-only -b krishna
+    swift --plot-only --input-dir output
 
-Run silently in the background (no console UI):
+Run silently (no console UI):
 
     swift -b krishna -q --quiet
+
+List WRIS basins and CWC station availability info:
+
+    swift --list
 
 ------------------------------------------------------------
 
