@@ -838,6 +838,17 @@ def merge(
     """
     if variable is not None and datasets is None:
         datasets = variable if isinstance(variable, list) else [variable]
+
+    # In CWC mode, merge operates on the entire CWC tree under the
+    # input/output root. Basin- or dataset-level selection is a WRIS
+    # concept; warn and ignore these hints rather than erroring.
+    if mode == "cwc" and (basin is not None or datasets is not None):
+        warnings.warn(
+            "swift.merge(mode='cwc', ...) ignores basin/datasets filters. "
+            "Merging all available CWC station files under the input/output root.",
+            UserWarning,
+            stacklevel=2,
+        )
     if isinstance(basin, (list, tuple, set)):
         basins = list(basin)
         if not basins:
@@ -944,6 +955,17 @@ def plot(
     """
     if variable is not None and datasets is None:
         datasets = variable if isinstance(variable, list) else [variable]
+
+    # In CWC mode, plotting scans all CWC station files under the root.
+    # Basin/dataset filters are WRIS concepts; warn and ignore when
+    # users pass them with mode='cwc'.
+    if mode == "cwc" and (basin is not None or datasets is not None):
+        warnings.warn(
+            "swift.plot(mode='cwc', ...) ignores basin/datasets filters. "
+            "Plotting all available CWC station files under the input/output root.",
+            UserWarning,
+            stacklevel=2,
+        )
     if isinstance(basin, (list, tuple, set)):
         basins = list(basin)
         if not basins:

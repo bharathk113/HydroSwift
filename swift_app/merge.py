@@ -19,7 +19,12 @@ def merge_dataset_folder(dataset_dir: str, gpkg_path: str, layer: str):
 
     for f in files:
         try:
-            df = pd.read_csv(f) if f.endswith(".csv") else pd.read_excel(f)
+            if f.endswith(".csv"):
+                # New SWIFT CSV format has \"#\" metadata lines before the
+                # actual header. Treat them as comments so pandas skips them.
+                df = pd.read_csv(f, comment="#")
+            else:
+                df = pd.read_excel(f)
 
             if {"lat", "lon"}.issubset(df.columns):
                 frames.append(df)
@@ -75,22 +80,69 @@ def run_merge_only(args):
 
     dataset_names = {folder for _, folder in DATASETS.values()}
 
+    output_base = Path(args.output_dir) if args.output_dir else root
+    try:
+        output_base.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:
+        raise PermissionError(
+            f"Cannot create output directory: {output_base}. "
+            "Check that the path exists and you have write permissions."
+        ) from exc
+    except OSError as exc:
+        raise OSError(
+            f"Failed to prepare output directory: {output_base}. "
+            f"Original error: {exc}"
+        ) from exc
+
     # ---------------------------------------------------------
-    # Detect basin directories
+    # CWC mode: merge from cwc/stations and cwc/<basin>/stations
+    # ---------------------------------------------------------
+    if getattr(args, "cwc", False):
+        cwc_root = root / "cwc"
+        if not cwc_root.exists() or not cwc_root.is_dir():
+            print("No CWC output found:", cwc_root)
+            return 0
+
+        # Collect all dirs that contain station CSVs/XLSX (flat or basin-aware)
+        station_dirs = []
+        legacy_stations = cwc_root / "stations"
+        if legacy_stations.exists() and legacy_stations.is_dir():
+            station_dirs.append((str(legacy_stations), "cwc_timeseries", "cwc_timeseries"))
+        for sub in cwc_root.iterdir():
+            if sub.is_dir() and sub.name != "stations":
+                stations_sub = sub / "stations"
+                if stations_sub.exists() and stations_sub.is_dir():
+                    basin_slug = sub.name
+                    layer = "cwc_timeseries"
+                    gpkg_name = f"cwc_timeseries_{basin_slug}.gpkg"
+                    station_dirs.append((str(stations_sub), gpkg_name, layer))
+
+        cwc_out = output_base / "cwc"
+        cwc_out.mkdir(parents=True, exist_ok=True)
+        for dataset_dir, gpkg_name, layer in station_dirs:
+            gpkg_path = cwc_out / gpkg_name
+            merge_dataset_folder(dataset_dir, str(gpkg_path), layer)
+        return 0
+
+    # ---------------------------------------------------------
+    # WRIS: detect basin directories
     # ---------------------------------------------------------
 
-    if any((root / d).is_dir() and d in dataset_names for d in os.listdir(root)):
-        basin_dirs = [root]
+    wris_root = root / "wris"
+    if wris_root.exists() and wris_root.is_dir():
+        wris_input_root = wris_root
     else:
-        basin_dirs = [d for d in root.iterdir() if d.is_dir()]
+        wris_input_root = root
+
+    if any((wris_input_root / d).is_dir() and d in dataset_names for d in os.listdir(wris_input_root)):
+        basin_dirs = [wris_input_root]
+    else:
+        basin_dirs = [d for d in wris_input_root.iterdir() if d.is_dir()]
 
     selected = selected_datasets(args)
 
-    output_base = Path(args.output_dir) if args.output_dir else root
-    output_base.mkdir(parents=True, exist_ok=True)
-
     # ---------------------------------------------------------
-    # Merge datasets
+    # Merge WRIS datasets
     # ---------------------------------------------------------
 
     for basin_dir in basin_dirs:

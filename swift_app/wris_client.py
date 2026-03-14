@@ -57,7 +57,7 @@ class WrisClient(BaseHydrologyClient):
 
     def post(self, url: str, payload: dict, retries: int = 3):
         """POST helper with retry and better diagnostics."""
-        for _ in range(retries):
+        for attempt in range(retries):
             try:
                 response = self.session.post(
                     url,
@@ -77,7 +77,14 @@ class WrisClient(BaseHydrologyClient):
                     print(response.text[:300])
 
             except Exception as e:
-                print("Request failed:", str(e))
+                # Keep retry messaging user-friendly for transient WRIS/API issues.
+                if attempt < retries - 1:
+                    print(
+                        "WRIS API is busy right now... hang on, retrying "
+                        f"({attempt + 1}/{retries})"
+                    )
+                else:
+                    print("WRIS API request failed after retries.")
 
             time.sleep(2)
 

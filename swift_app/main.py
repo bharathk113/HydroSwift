@@ -149,17 +149,21 @@ def main() -> int:
             raise SystemExit("Input directory not found")
 
         # -----------------------------------------------------
-        # Detect basin folders
+        # Detect WRIS root / basin folders
         # -----------------------------------------------------
 
         dataset_names = {folder for _, folder in DATASETS.values()}
 
-        if any((root / d).is_dir() and d in dataset_names for d in os.listdir(root)):
-            basin_dirs = [root]
+        wris_root = root / "wris"
+        if wris_root.exists() and wris_root.is_dir():
+            input_root = wris_root
         else:
-            basin_dirs = [ d for d in root.iterdir()
-            if d.is_dir() and is_valid_basin_folder(d)
-            ]
+            input_root = root
+
+        if any((input_root / d).is_dir() and d in dataset_names for d in os.listdir(input_root)):
+            basin_dirs = [input_root]
+        else:
+            basin_dirs = [d for d in input_root.iterdir() if d.is_dir() and is_valid_basin_folder(d)]
 
         selected = selected_datasets(args)
 
@@ -281,6 +285,7 @@ def main() -> int:
     run_wris_download(args, selected, client, basin_code)
 
     if args.plot:
+        args.input_dir = str(Path(args.output_dir) / "wris" / args.basin.lower())
         run_plot_only(args)
 
     return 0
