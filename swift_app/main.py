@@ -55,9 +55,9 @@ def main() -> int:
     from pathlib import Path
 
     from .cli import build_parser, DATASETS, selected_datasets, WRIS_BASINS
-    from .api import WrisClient
+    from .wris_client import WrisClient
     from .plot import run_plot_only
-    from .download import run_download
+    from .wris import run_wris_download
     from .cwc import run_cwc_download
     from .merge import merge_dataset_folder
 
@@ -119,7 +119,7 @@ def main() -> int:
         try:
             from .cwc import load_station_table
 
-            stations = load_station_table()
+            stations = load_station_table(refresh=getattr(args, "cwc_refresh", False))
             count = 0 if stations is None else len(stations)
             print(f"  Total known stations: {count}")
             print("  Tip: use --cwc-station <CODE1 CODE2 ...> to download selected stations")
@@ -229,7 +229,7 @@ def main() -> int:
             unsupported.append("atmospheric pressure")
 
         if unsupported:
-            from .download import Console
+            from .utils import Console
             Console.warn("CWC API only supports water level data.")
             if not args.quiet:
                 print(f"  Ignoring unsupported datasets: {', '.join(unsupported)}\n")
@@ -278,4 +278,9 @@ def main() -> int:
     if not selected:
         raise SystemExit("No dataset selected")
 
-    return run_download(args, selected, client, basin_code)
+    run_wris_download(args, selected, client, basin_code)
+
+    if args.plot:
+        run_plot_only(args)
+
+    return 0

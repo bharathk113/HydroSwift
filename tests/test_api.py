@@ -11,7 +11,7 @@ def test_wris_client_init():
     assert client.session is not None
     assert "User-Agent" in client.session.headers
 
-@patch("swift_app.api.requests.Session.post")
+@patch("swift_app.wris_client.requests.Session.post")
 def test_wris_check_api(mock_post):
     mock_post.return_value.status_code = 200
     mock_post.return_value.json.return_value = {"status": "success"}
@@ -22,7 +22,7 @@ def test_wris_check_api(mock_post):
     mock_post.return_value.status_code = 500
     assert client.check_api() == False
 
-@patch("swift_app.api.requests.Session.post")
+@patch("swift_app.wris_client.requests.Session.post")
 def test_get_metadata_parser(mock_post):
     mock_response = MagicMock()
     mock_response.status_code = 200

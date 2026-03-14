@@ -1,4 +1,4 @@
-"""Download pipeline for SWIFT."""
+"""WRIS download pipeline for SWIFT."""
 
 from __future__ import annotations
 
@@ -11,57 +11,7 @@ from threading import Lock
 
 import pandas as pd
 
-
-# ---------------------------------------------------------
-# SWIFT Console Styling
-# ---------------------------------------------------------
-
-class Console:
-    RESET = "\033[0m"
-    BOLD = "\033[1m"
-    ITALIC = "\033[3m"
-
-    GREEN = "\033[92m"
-    YELLOW = "\033[93m"
-    CYAN = "\033[96m"
-    MAGENTA = "\033[95m"
-    
-    is_quiet = False
-
-    @staticmethod
-    def section(title):
-        if not Console.is_quiet:
-            print(f"\n{Console.MAGENTA}{Console.BOLD}{title}{Console.RESET}")
-
-    @staticmethod
-    def warn(msg):
-        if not Console.is_quiet:
-            print(f"{Console.YELLOW}{Console.BOLD}{msg}{Console.RESET}")
-
-    @staticmethod
-    def info(msg):
-        if not Console.is_quiet:
-            print(f"{Console.CYAN}{msg}{Console.RESET}")
-
-    @staticmethod
-    def success(msg):
-        if not Console.is_quiet:
-            print(f"{Console.GREEN}{Console.BOLD}{msg}{Console.RESET}")
-
-
-class Logger:
-    """Manages background logging to the output directory."""
-    
-    def __init__(self, output_dir: str):
-        self.log_path = os.path.join(output_dir, "swift.log")
-        
-    def log(self, level: str, msg: str):
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            with open(self.log_path, "a") as f:
-                f.write(f"[{timestamp}] [{level}] {msg}\n")
-        except Exception:
-            pass
+from .utils import Console, Logger
 
 
 try:
@@ -265,7 +215,7 @@ def filter_existing_stations(stations, dataset_dir, ext):
 # Main download engine
 # ---------------------------------------------------------
 
-def run_download(args, selected: dict[str, str], client, basin_code: str):
+def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
 
     import json
 
@@ -319,11 +269,14 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
     # ---------------------------------------------------------
 
     total_stations = 0
+    station_filter = getattr(args, "stations", None)
+    if station_filter:
+        station_filter = {str(s) for s in station_filter}
 
     for dataset_code in selected.keys():
 
         if dataset_code in basin_station_cache:
-            stations = basin_station_cache[dataset_code]
+            stations = list(basin_station_cache[dataset_code])
         else:
             stations = discover_stations(
                 client,
@@ -335,7 +288,11 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             basin_station_cache[dataset_code] = stations
             cache_updated = True
 
-        total_stations += len(stations)
+        stations_for_run = stations
+        if station_filter:
+            stations_for_run = [s for s in stations if s in station_filter]
+
+        total_stations += len(stations_for_run)
 
     workers = min(8, (os.cpu_count() or 1) * 2)
     est_runtime = int(total_stations * args.delay / max(workers, 1))
@@ -379,18 +336,22 @@ def run_download(args, selected: dict[str, str], client, basin_code: str):
             cache_updated = True
             logger.log("INFO", f"Discovered {len(stations)} stations from WRIS API")
 
+        stations_for_run = stations
+        if station_filter:
+            stations_for_run = [s for s in stations if s in station_filter]
+
         dataset_dir = os.path.join(base_output, folder)
         os.makedirs(dataset_dir, exist_ok=True)
 
         ext = args.format.lower()
 
         if args.overwrite:
-            station_list = stations
+            station_list = stations_for_run
         else:
-            station_list = filter_existing_stations(stations, dataset_dir, ext)
+            station_list = filter_existing_stations(stations_for_run, dataset_dir, ext)
 
         remaining = len(station_list)
-        skipped = 0 if args.overwrite else len(stations) - remaining
+        skipped = 0 if args.overwrite else len(stations_for_run) - remaining
 
 
         if skipped > 0:

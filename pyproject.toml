@@ -1,5 +1,8 @@
 [tool.setuptools]
 packages = ["swift_app"]
+
+[tool.setuptools.package-data]
+swift_app = ["*.csv"]
 [project]
 name = "swift-wris"
 version = "1.0.0"

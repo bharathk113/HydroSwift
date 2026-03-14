@@ -28,7 +28,7 @@ def test_cwc_download_retry_logic(mock_sleep, mock_get):
     result = fetch_station_data("TestStation")
     assert result is not None
     assert len(result) == 1
-    assert result["wse"].iloc[0] == 10.5
+    assert result["water_level"].iloc[0] == 10.5
     
     # It should have called get 3 times
     assert mock_get.call_count == 3

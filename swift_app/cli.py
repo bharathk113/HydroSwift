@@ -107,9 +107,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--overwrite", action="store_true", help="Overwrite existing files"
     )
     download.add_argument(
-    "--merge-only",
-    action="store_true",
-    help="Merge existing station files into a GeoPackage without downloading",
+        "--merge-only",
+        action="store_true",
+        help=(
+            "Merge existing SWIFT station files into GeoPackages without "
+            "downloading new data (Python equivalent: swift.merge(...))"
+        ),
     )
     parser.add_argument(
     "--cwc",
@@ -121,6 +124,13 @@ def build_parser() -> argparse.ArgumentParser:
     "--cwc-station",
     nargs="+",
     help="Download CWC data for specific station codes (see --list for details)",
+    )
+    parser.add_argument(
+    "--cwc-refresh",
+    action="store_true",
+    default=False,
+    help="Refresh CWC station metadata from the live API (~2 min). "
+         "Default uses the packaged metadata file.",
     )
     download.add_argument(
         "--delay",
@@ -154,7 +164,10 @@ def build_parser() -> argparse.ArgumentParser:
     output.add_argument(
         "--plot",
         action="store_true",
-        help="Generate station time series plots after download",
+        help=(
+            "Generate station time series plots after download "
+            "(Python equivalent for existing output: swift.plot(...))"
+        ),
     )
     output.add_argument(
         "--output-dir", default="output", help="Custom output directory (default: output)"
@@ -177,7 +190,10 @@ def build_parser() -> argparse.ArgumentParser:
     misc.add_argument(
         "--plot-only",
         action="store_true",
-        help="Generate plots from existing SWIFT output (no download)",
+        help=(
+            "Generate plots from existing SWIFT output without downloading "
+            "(Python equivalent: swift.plot(..., cwc=...))"
+        ),
     )
 
     return parser

@@ -64,33 +64,32 @@ SWIFT is primarily designed as a robust Python module for programmatic use in yo
 ```python
 import swift_app
 
-# 1. Search for available stations
-wris_stations = swift_app.search_stations(dataset="discharge", basin="Godavari")
-cwc_stations = swift_app.cwc_stations()
+# 1. List available stations
+wris_stations = swift_app.wris.stations(basin="Godavari", variable="discharge")
+cwc_stations = swift_app.cwc.stations()
 
 # 2. Download specific CWC stations
-swift_app.download(
-    cwc_station=["040-CDJAPR", "038-CDJAPR"], 
-    start_date="2010-01-01", 
+swift_app.cwc.download(
+    station=["040-CDJAPR", "038-CDJAPR"],
+    start_date="2010-01-01",
     format="xlsx",
-    plot=True
+    plot=True,
 )
 
-# 3. Download an entire WRIS basin silently
-swift_app.download(
-    basin="Krishna", 
-    datasets=["discharge"],
-    merge=True, 
-    quiet=True
+# 3. Download an entire WRIS basin
+swift_app.wris.download(
+    basin="Krishna",
+    variable="discharge",
+    merge=True,
+    quiet=True,
 )
 
-# Optional: output_dir defaults to "output"
-# swift_app.download(..., output_dir="output")
+# Or use the unified entry point
+swift_app.fetch("wris", basin="Krishna", variable="discharge", merge=True, quiet=True)
+swift_app.fetch("cwc", station=["040-CDJAPR"])
 
-# Supported Python dataset names:
-# discharge, water_level, atm_pressure, rainfall,
-# temperature, humidity, solar_radiation,
-# sediment, groundwater_level
+# Supported variable names: discharge, water_level, rainfall, temperature,
+# humidity, solar_radiation, sediment, groundwater_level
 ```
 
 > Note: `dataset_flags=["q", "rf", ...]` is still accepted for backwards compatibility,

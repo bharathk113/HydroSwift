@@ -16,15 +16,15 @@ APP_ORG = "Carbform • carbform.github.io"
 VERSION = f"{__version__}"
 VERSION_FULL = f"{VERSION} — {__codename__}"
 
-from .api_public import (
-    download,
+from .api import (
+    wris,
+    cwc_ns as cwc,
     merge,
     plot,
-    search_stations,
-    basins,
+    fetch,
     datasets,
+    basins,
     cite,
     coffee,
-    cwc_station
 )
 from .base_client import BaseHydrologyClient

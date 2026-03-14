@@ -27,150 +27,440 @@ CWC_API = "https://ffs.india-water.gov.in/iam/api/new-entry-data/specification/s
 
 
 # ---------------------------------------------------------
-# Load station table
+# Paths
 # ---------------------------------------------------------
-def load_station_table():
 
-    import time
+CACHE_DIR = Path.home() / ".swift_cache"
+CACHE_FILE = CACHE_DIR / "cwc_meta.csv"
+PACKAGED_CSV = Path(__file__).parent / "cwc_meta.csv"
 
-    cache_dir = Path.home() / ".swift_cache"
-    cache_file = cache_dir / "cwc_stations.csv"
+CACHE_TTL = 86400  # 24 hours
 
-    cache_dir.mkdir(exist_ok=True)
 
-    # ---------------------------------------------------------
-    # Use cache if fresh (<24 hours)
-    # ---------------------------------------------------------
-
-    if cache_file.exists():
-
-        age = time.time() - cache_file.stat().st_mtime
-
-        if age < 86400:  # 24 hours
-            try:
-                df = pd.read_csv(cache_file)
-                if not df.empty:
-                    return df
-                print("Using cached CWC station metadata")
-            except Exception:
-                pass
-
-    # ---------------------------------------------------------
-    # Fetch from API
-    # ---------------------------------------------------------
-
+def _read_csv_safe(path):
+    """Read a CSV, normalise column names, return DataFrame or None."""
     try:
-
-        df = fetch_cwc_station_metadata()
-        print("Fetching CWC station metadata from API")
-
+        df = pd.read_csv(path)
+        df.columns = [c.lower().strip() for c in df.columns]
         if not df.empty:
-            df.to_csv(cache_file, index=False)
             return df
+    except Exception:
+        pass
+    return None
 
 
+def _write_cache(df):
+    """Persist a DataFrame to the user-level cache file."""
+    try:
+        CACHE_DIR.mkdir(exist_ok=True)
+        df.to_csv(CACHE_FILE, index=False)
     except Exception:
         pass
 
-    # ---------------------------------------------------------
-    # Fallback to packaged CSV
-    # ---------------------------------------------------------
 
-    station_file = Path(__file__).parent / "cwc_stations.csv"
+# ---------------------------------------------------------
+# Load station table
+# ---------------------------------------------------------
 
-    if station_file.exists():
-        df = pd.read_csv(station_file)
-        df.columns = [c.lower().strip() for c in df.columns]
+def load_station_table(refresh=False):
+    """
+    Load CWC station metadata.
+
+    Parameters
+    ----------
+    refresh : bool, default False
+        False — read the packaged cwc_meta.csv (fast, no network).
+        True  — fetch fresh metadata from the CWC FFS API, update the
+                local cache, then return the new table.  Falls back to
+                the packaged CSV on failure.
+    """
+    if not refresh:
+        df = _read_csv_safe(CACHE_FILE)
+        if df is not None:
+            return df
+        df = _read_csv_safe(PACKAGED_CSV)
+        if df is not None:
+            return df
+        raise RuntimeError("Packaged CWC metadata file not found")
+
+    # refresh=True — live fetch
+    import warnings
+    warnings.warn(
+        "CWC station metadata is mostly static (updated only when a new "
+        "HFL is recorded).  A live refresh takes ~2 minutes.  The "
+        "packaged metadata file is usually sufficient.",
+        stacklevel=3,
+    )
+    try:
+        df = fetch_cwc_station_metadata()
+        if df is not None and not df.empty:
+            _write_cache(df)
+            return df
+    except Exception:
+        pass
+    # fall back to cache then packaged
+    df = _read_csv_safe(CACHE_FILE)
+    if df is not None:
         return df
-
+    df = _read_csv_safe(PACKAGED_CSV)
+    if df is not None:
+        return df
     raise RuntimeError("Unable to retrieve CWC station metadata")
 
-# Get metadata for all stations
+# ---------------------------------------------------------
+# Station code pattern for CWC flood forecasting stations
+# that have time series data (e.g. "040-CDJAPR").
+# The layer-station API returns ALL station types; only
+# codes matching NNN-... carry HHS water-level data.
+# ---------------------------------------------------------
 
-def fetch_cwc_station_metadata():
+import re
 
-    base = "https://ffs.india-water.gov.in/iam/api/layer-station"
+_TS_CODE_RE = re.compile(r"^\d{3}-")
+
+CWC_BASE = "https://ffs.india-water.gov.in/iam/api"
+LAYER_STATION_BASE = f"{CWC_BASE}/layer-station"
+
+
+def _fetch_lookup_sorted(entity, sort_field="name"):
+    """Fetch a complete lookup table via the /specification/sorted endpoint."""
+    import json
 
     headers = {"User-Agent": "Mozilla/5.0"}
-
-    # ------------------------------------------------
-    # Step 1 — get station codes
-    # ------------------------------------------------
-
-    url = f"{base}/specification/sorted-page"
-
+    url = f"{CWC_BASE}/{entity}/specification/sorted"
     params = {
-        "sort-criteria": "%7B%22sortOrderDtos%22:%5B%7B%22sortDirection%22:%22ASC%22,%22field%22:%22name%22%7D%5D%7D",
-        "page-number": 0,
-        "page-size": 2000,
-        "specification": "%7B%22unique%22:true%7D"
+        "sort-criteria": json.dumps(
+            {"sortOrderDtos": [{"sortDirection": "ASC", "field": sort_field}]}
+        ),
+        "specification": json.dumps({"unique": True}),
+    }
+    r = session.get(url, params=params, headers=headers, timeout=120)
+    r.raise_for_status()
+    return r.json()
+
+
+def _fetch_lookup_paged(entity, sort_field="name", page_size=5000):
+    """Fetch a lookup table via the paginated /specification/sorted-page endpoint."""
+    import json
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+    url = f"{CWC_BASE}/{entity}/specification/sorted-page"
+    all_items = []
+    for page in range(20):
+        params = {
+            "sort-criteria": json.dumps(
+                {"sortOrderDtos": [{"sortDirection": "ASC", "field": sort_field}]}
+            ),
+            "page-number": page,
+            "page-size": page_size,
+            "specification": json.dumps({"unique": True}),
+        }
+        r = session.get(url, params=params, headers=headers, timeout=120)
+        r.raise_for_status()
+        items = r.json()
+        if not items:
+            break
+        all_items.extend(items)
+        if len(items) < page_size:
+            break
+    return all_items
+
+
+def _fetch_all_lookups():
+    """
+    Fetch all CWC lookup tables in parallel and return dicts for
+    in-memory chain resolution.
+    """
+    _TASKS = {
+        "localrivers": ("master-basin-localriver", "sorted", "name"),
+        "subsubtribs": ("master-basin-subsubtributary", "sorted", "name"),
+        "subtribs": ("master-basin-subtributary", "paged", "subtributaryId"),
+        "tributaries": ("master-basin-tributary", "paged", "tributaryId"),
+        "rivers": ("layer-river", "sorted", "name"),
+        "basins": ("layer-basin", "sorted", "name"),
+        "tahsils": ("master-tahsil", "sorted", "name"),
+        "districts": ("layer-district", "sorted", "name"),
+        "states": ("layer-state", "sorted", "name"),
+        "subdiv_offices": ("master-subdivisional-office", "sorted", "name"),
+        "div_offices": ("master-divisional-office", "sorted", "name"),
+        "flood_forecast": ("flood-forecast-static", "sorted", "stationCode"),
     }
 
-    r = session.get(url, params=params, headers=headers, timeout=120)
+    raw = {}
 
-    if r.status_code != 200:
-        raise RuntimeError("Failed to fetch station list")
+    def _do(key, entity, mode, sf):
+        if mode == "sorted":
+            return key, _fetch_lookup_sorted(entity, sf)
+        return key, _fetch_lookup_paged(entity, sf)
 
-    stations = r.json()
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futs = {
+            pool.submit(_do, k, ent, m, sf): k
+            for k, (ent, m, sf) in _TASKS.items()
+        }
+        for f in as_completed(futs):
+            try:
+                k, data = f.result()
+                raw[k] = data
+            except Exception:
+                raw[futs[f]] = []
 
-    codes = [s.get("stationCode") for s in stations if s.get("stationCode")]
+    # -- river name -------------------------------------------------
+    lr_name = {
+        x["localriverId"]: x.get("name")
+        for x in raw.get("localrivers", [])
+    }
 
-    # ------------------------------------------------
-    # Step 2 — fetch metadata per station
-    # ------------------------------------------------
+    # -- basin chain: localriver → subsubtrib → subtrib → trib → river → basin
+    lr_ssub = {
+        x["localriverId"]: x.get("subsubtributaryId")
+        for x in raw.get("localrivers", [])
+    }
+    ssub_sub = {
+        x["subsubtributaryId"]: x.get("subtributaryId")
+        for x in raw.get("subsubtribs", [])
+    }
+    sub_trib = {
+        x["subtributaryId"]: x.get("tributaryId")
+        for x in raw.get("subtribs", [])
+    }
+    trib_riv = {
+        x["tributaryId"]: x.get("riverId")
+        for x in raw.get("tributaries", [])
+    }
+    riv_basin = {
+        x["riverId"]: x.get("basinCode")
+        for x in raw.get("rivers", [])
+    }
+    basin_name = {
+        x["basinCode"]: x.get("name")
+        for x in raw.get("basins", [])
+    }
+
+    def resolve_basin(lr_id):
+        ssid = lr_ssub.get(lr_id)
+        sid = ssub_sub.get(ssid) if ssid else None
+        tid = sub_trib.get(sid) if sid else None
+        rid = trib_riv.get(tid) if tid else None
+        bc = riv_basin.get(rid) if rid else None
+        return basin_name.get(bc) if bc else None
+
+    # -- district / state chain: tahsil → district → state ----------
+    tah_dist = {
+        x["tahsilId"]: x.get("districtId")
+        for x in raw.get("tahsils", [])
+    }
+    dist_info = {
+        x["districtId"]: (x.get("name"), x.get("stateCode"))
+        for x in raw.get("districts", [])
+    }
+    state_name = {
+        x["stateCode"]: x.get("name")
+        for x in raw.get("states", [])
+    }
+
+    def resolve_district(tahsil_id):
+        did = tah_dist.get(tahsil_id)
+        return dist_info.get(did, (None, None))[0] if did else None
+
+    def resolve_state(tahsil_id):
+        did = tah_dist.get(tahsil_id)
+        if not did:
+            return None
+        _, sc = dist_info.get(did, (None, None))
+        return state_name.get(sc) if sc else None
+
+    # -- division chain: subdiv_office → div_office -----------------
+    subdiv_div = {
+        x["subdivisionalOfficeId"]: x.get("divisionalOfficeId")
+        for x in raw.get("subdiv_offices", [])
+    }
+    div_name = {
+        x["divisionalOfficeId"]: x.get("name")
+        for x in raw.get("div_offices", [])
+    }
+
+    def resolve_division(subdiv_id):
+        did = subdiv_div.get(subdiv_id)
+        return div_name.get(did) if did else None
+
+    # -- flood forecast data ----------------------------------------
+    ff_map = {}
+    for ff in raw.get("flood_forecast", []):
+        code = ff.get("stationCode") or ff.get("layerStationStationCode")
+        if code:
+            ff_map[code] = ff
+
+    return (
+        lr_name,
+        resolve_basin,
+        resolve_state,
+        resolve_district,
+        resolve_division,
+        ff_map,
+    )
+
+
+def fetch_cwc_station_metadata():
+    """
+    Fetch comprehensive metadata for all CWC flood-forecast stations
+    that have time-series data.
+
+    Uses the same API filter as the CWC website (agencyId=41, non-null
+    floodForecastStaticStationCode).  Metadata is resolved through bulk
+    lookup tables fetched in parallel — river, basin, state, district,
+    division, and flood-level data — then joined in memory.
+    """
+    import json
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+    list_url = f"{LAYER_STATION_BASE}/specification/sorted-page"
+
+    # -- Fetch all lookup tables in parallel while we paginate ------
+    (
+        lr_name,
+        resolve_basin,
+        resolve_state,
+        resolve_district,
+        resolve_division,
+        ff_map,
+    ) = _fetch_all_lookups()
+
+    # -- Paginate station listing -----------------------------------
+    sort = json.dumps(
+        {"sortOrderDtos": [{"sortDirection": "ASC", "field": "name"}]}
+    )
+    spec = json.dumps({
+        "where": {
+            "expression": {
+                "valueIsRelationField": False,
+                "fieldName": (
+                    "subdivisionalOfficeId.divisionalOfficeId"
+                    ".circleOfficeId.regionalOfficeId.agencyId.agencyId"
+                ),
+                "operator": "eq",
+                "value": "41",
+            }
+        },
+        "and": {
+            "expression": {
+                "valueIsRelationField": False,
+                "fieldName": "floodForecastStaticStationCode.stationCode",
+                "operator": "null",
+                "value": "false",
+            }
+        },
+        "unique": True,
+    })
+    page_size = 500
 
     rows = []
 
-    def fetch_station(code):
+    for page_num in range(50):
+        params = {
+            "sort-criteria": sort,
+            "page-number": page_num,
+            "page-size": page_size,
+            "specification": spec,
+        }
 
-        try:
+        r = session.get(list_url, params=params, headers=headers, timeout=180)
 
-            r = session.get(f"{base}/{code}", headers=headers, timeout=60)
+        if r.status_code != 200:
+            break
 
-            if r.status_code != 200:
-                return None
+        stations = r.json()
+        if not isinstance(stations, list) or len(stations) == 0:
+            break
 
-            s = r.json()
+        for s in stations:
+            code = s.get("stationCode")
+            if not code or not _TS_CODE_RE.match(code):
+                continue
 
-            ff = s.get("floodForecastStaticStationCode") or {}
+            lr_id = s.get("streamLocalriverId")
+            tahsil_id = s.get("tahsilId")
+            subdiv_id = s.get("subdivisionalOfficeId")
+            ff = ff_map.get(code, {})
 
-            return {
-                "code": s.get("stationCode"),
+            rows.append({
+                "code": code,
                 "name": s.get("name"),
-
-                "river": (s.get("river") or {}).get("name"),
-                "basin": (s.get("basin") or {}).get("name"),
-
-                "state": (s.get("stateCode") or {}).get("name"),
-                "district": (s.get("districtId") or {}).get("name"),
-
+                "river": lr_name.get(lr_id) if lr_id else None,
+                "basin": resolve_basin(lr_id) if lr_id else None,
+                "state": resolve_state(tahsil_id) if tahsil_id else None,
+                "district": resolve_district(tahsil_id) if tahsil_id else None,
+                "division": resolve_division(subdiv_id) if subdiv_id else None,
                 "lat": s.get("lat"),
                 "lon": s.get("lon"),
-
                 "rl_zero": s.get("reducedLevelOfZeroGauge"),
-
                 "warning_level": ff.get("warningLevel"),
                 "danger_level": ff.get("dangerLevel"),
                 "hfl": ff.get("highestFlowLevel"),
                 "hfl_date": ff.get("highestFlowLevelDate"),
-            }
+            })
 
-        except Exception:
-            return None
+        if len(stations) < page_size:
+            break
 
-    from concurrent.futures import ThreadPoolExecutor
+    if not rows:
+        raise RuntimeError("No CWC time-series station codes found")
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    # -- Fetch lat/lon/rl_zero from per-station detail endpoint -----
+    # The listing returns these as null; only the detail endpoint
+    # (/layer-station/{code}) populates them.
 
-        results = executor.map(fetch_station, codes)
+    import time as _time
 
-    for r in results:
-        if r:
-            rows.append(r)
+    codes_to_fetch = [r["code"] for r in rows]
+
+    def _fetch_geo(code, retries=3):
+        delays = [2, 5, 10]
+        for attempt in range(retries):
+            try:
+                resp = session.get(
+                    f"{LAYER_STATION_BASE}/{code}",
+                    headers=headers,
+                    timeout=60,
+                )
+                if resp.status_code != 200:
+                    if attempt < retries - 1:
+                        _time.sleep(delays[attempt])
+                        continue
+                    return code, None, None, None
+                d = resp.json()
+                return (
+                    code,
+                    d.get("lat"),
+                    d.get("lon"),
+                    d.get("reducedLevelOfZeroGauge"),
+                )
+            except Exception:
+                if attempt < retries - 1:
+                    _time.sleep(delays[attempt])
+                    continue
+                return code, None, None, None
+        return code, None, None, None
+
+    geo = {}
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        for result in pool.map(_fetch_geo, codes_to_fetch):
+            code, lat, lon, rl = result
+            geo[code] = (lat, lon, rl)
+
+    for row in rows:
+        lat, lon, rl = geo.get(row["code"], (None, None, None))
+        row["lat"] = lat
+        row["lon"] = lon
+        row["rl_zero"] = rl
 
     df = pd.DataFrame(rows)
-
+    df = df.drop_duplicates(subset="code")
     df = df.sort_values("code").reset_index(drop=True)
+
+    # Strip stray whitespace / tab characters from string columns
+    for col in df.select_dtypes(include="object").columns:
+        df[col] = df[col].str.strip()
 
     return df
 
@@ -233,7 +523,7 @@ def fetch_station_data(code, start_date=None, end_date=None, retries=3):
                         pass
 
                 if rows:
-                    df = pd.DataFrame(rows, columns=["station_code", "time", "wse"])
+                    df = pd.DataFrame(rows, columns=["station_code", "time", "water_level"])
                     df["time"] = pd.to_datetime(df["time"])
                     return df
 
@@ -245,48 +535,37 @@ def fetch_station_data(code, start_date=None, end_date=None, retries=3):
 
     return None
 
-def get_cwc_station_metadata(query=None, basin=None, river=None):
+def get_cwc_station_metadata(
+    station=None, basin=None, river=None, refresh=False
+):
     """
-    Return metadata for CWC stations.
+    Return metadata for CWC flood-forecast stations.
 
     Parameters
     ----------
-    query : str
-        Partial station code or name.
-    basin : str
-        Basin name filter.
-    river : str
-        River name filter.
+    station : str, optional
+        Station code or partial name to search for.
+    basin : str, optional
+        Basin name filter (substring match).
+    river : str, optional
+        River name filter (substring match).
+    refresh : bool, default False
+        If True, fetch fresh metadata from the CWC FFS API.
     """
-
-    stations = load_station_table()
-
+    stations = load_station_table(refresh=refresh)
     df = stations.copy()
-
-    # ---------------------------------------------------------
-    # Basin filter
-    # ---------------------------------------------------------
 
     if basin:
         df = df[df["basin"].str.lower().str.contains(basin.lower(), na=False)]
 
-    # ---------------------------------------------------------
-    # River filter
-    # ---------------------------------------------------------
-
     if river:
         df = df[df["river"].str.lower().str.contains(river.lower(), na=False)]
 
-    # ---------------------------------------------------------
-    # Code / name search
-    # ---------------------------------------------------------
-
-    if query:
-        q = str(query).lower()
-
+    if station:
+        q = str(station).lower()
         df = df[
-            df["code"].str.lower().str.contains(q)
-            | df["name"].str.lower().str.contains(q)
+            df["code"].str.lower().str.contains(q, na=False)
+            | df["name"].str.lower().str.contains(q, na=False)
         ]
 
     if df.empty:
@@ -372,6 +651,7 @@ def download_station(station, output_dir, args):
     for field in [
         "river",
         "basin",
+        "division",
         "rl_zero",
         "warning_level",
         "danger_level",
@@ -383,12 +663,21 @@ def download_station(station, output_dir, args):
 
     cols = [
         "station_code",
+        "station_name",
         "time",
         "wse",
         "water_depth",
         "unit",
         "lat",
         "lon",
+        "river",
+        "basin",
+        "division",
+        "rl_zero",
+        "warning_level",
+        "danger_level",
+        "hfl",
+        "hfl_date",
     ]
     df = df[[c for c in cols if c in df.columns]]
 
@@ -419,7 +708,7 @@ def run_cwc_download(args):
     import time as _time
     from pathlib import Path
     from concurrent.futures import ThreadPoolExecutor
-    from .download import Console, Logger
+    from .utils import Console, Logger
 
     try:
         import importlib
@@ -439,7 +728,9 @@ def run_cwc_download(args):
 
     dataset_start = _time.time()
 
-    stations = load_station_table()
+    stations = load_station_table(
+        refresh=getattr(args, "cwc_refresh", False)
+    )
 
     # ---------------------------------------------------------
     # Station filter
