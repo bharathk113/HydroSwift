@@ -10,6 +10,9 @@ import pandas as pd
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from .utils import Console, Logger
+from .wris import build_metadata
+
 # ---------------------------------------------------------
 # HTTP session (connection reuse)
 # ---------------------------------------------------------
@@ -536,7 +539,7 @@ def fetch_station_data(code, start_date=None, end_date=None, retries=3):
     return None
 
 def get_cwc_station_metadata(
-    station=None, basin=None, river=None, refresh=False
+    station=None, basin=None, river=None, state=None, refresh=False
 ):
     """
     Return metadata for CWC flood-forecast stations.
@@ -549,6 +552,8 @@ def get_cwc_station_metadata(
         Basin name filter (substring match).
     river : str, optional
         River name filter (substring match).
+    state : str, optional
+        State name filter (substring match).
     refresh : bool, default False
         If True, fetch fresh metadata from the CWC FFS API.
     """
@@ -560,6 +565,9 @@ def get_cwc_station_metadata(
 
     if river:
         df = df[df["river"].str.lower().str.contains(river.lower(), na=False)]
+
+    if state:
+        df = df[df["state"].str.lower().str.contains(state.lower(), na=False)]
 
     if station:
         q = str(station).lower()
@@ -594,10 +602,7 @@ def download_station(station, output_dir, args):
 
     ext = args.format
 
-    outfile = os.path.join(
-        output_dir,
-        f"{code}_{safe_name}.{ext}"
-    )
+    outfile = os.path.join(output_dir, f"{code}_{safe_name}.{ext}")
 
     # ---------------------------------------------------------
     # Skip existing file unless overwrite
@@ -611,9 +616,9 @@ def download_station(station, output_dir, args):
     # ---------------------------------------------------------
 
     df = fetch_station_data(
-    code,
-    start_date=args.start_date,
-    end_date=args.end_date
+        code,
+        start_date=args.start_date,
+        end_date=args.end_date,
     )
 
     if df is None or df.empty:
@@ -629,6 +634,10 @@ def download_station(station, output_dir, args):
 
     if df.empty:
         return False
+
+    # Normalise CWC value column so downstream plot/merge logic can rely on `wse`.
+    if "wse" not in df.columns and "water_level" in df.columns:
+        df["wse"] = pd.to_numeric(df["water_level"], errors="coerce")
     
     rl = station.get("rl_zero")
 
@@ -636,62 +645,74 @@ def download_station(station, output_dir, args):
         try:
             df["water_depth"] = df["wse"] - float(rl)
         except Exception:
-            pass    
+            # If rl_zero cannot be parsed, just skip water_depth.
+            pass
 
     # ---------------------------------------------------------
-    # Attach station metadata
+    # Attach minimal station metadata to rows
+    # (full metadata moved to file header for CSV/XLSX)
     # ---------------------------------------------------------
 
-    df["station_name"] = name
     df["unit"] = "m"
     df["lat"] = lat
     df["lon"] = lon
+    df["station_code"] = code
 
-    # Optional metadata
-    for field in [
-        "river",
-        "basin",
-        "division",
-        "rl_zero",
-        "warning_level",
-        "danger_level",
-        "hfl",
-        "hfl_date",
-    ]:
-        if field in station:
-            df[field] = station.get(field)
-
+    # Keep the row-level dataframe lean: only fields needed for
+    # plotting/merge; richer metadata is written once in the header.
     cols = [
         "station_code",
-        "station_name",
         "time",
         "wse",
         "water_depth",
         "unit",
         "lat",
         "lon",
-        "river",
-        "basin",
-        "division",
-        "rl_zero",
-        "warning_level",
-        "danger_level",
-        "hfl",
-        "hfl_date",
     ]
     df = df[[c for c in cols if c in df.columns]]
 
     # ---------------------------------------------------------
-    # Save file
+    # Build metadata header (WRIS-style, but for CWC)
+    # ---------------------------------------------------------
+
+    meta_src = dict(station)
+    meta_src.setdefault("station_code", code)
+    meta_src.setdefault("station_name", name)
+
+    meta_dict = build_metadata(meta_src, dataset="water_level", source="CWC")
+
+    # ---------------------------------------------------------
+    # Save file (WRIS-compatible layout)
     # ---------------------------------------------------------
 
     try:
-
         if args.format == "csv":
-            df.to_csv(outfile, index=False)
+            # CSV: write a metadata preamble with "#" lines followed by
+            # a compact timeseries table.
+            header_lines = ["# SWIFT Hydrological Timeseries"]
+            for key, value in meta_dict.items():
+                if value is not None and value != "":
+                    header_lines.append(f"# {key}: {value}")
+
+            with open(outfile, "w") as f:
+                for line in header_lines:
+                    f.write(line + "\n")
+
+            df.to_csv(outfile, mode="a", index=False)
 
         elif args.format == "xlsx":
-            df.to_excel(outfile, index=False)
+            # XLSX: mirror WRIS convention — one sheet for timeseries,
+            # one sheet for station metadata.
+            meta_items = [
+                (k, v) for k, v in meta_dict.items() if v is not None and v != ""
+            ]
+            meta_df = pd.DataFrame(
+                [{"field": k, "value": v} for k, v in meta_items]
+            )
+
+            with pd.ExcelWriter(outfile) as writer:
+                df.to_excel(writer, sheet_name="timeseries", index=False)
+                meta_df.to_excel(writer, sheet_name="metadata", index=False)
 
     except Exception:
         return False
@@ -707,8 +728,6 @@ def run_cwc_download(args):
     import glob
     import time as _time
     from pathlib import Path
-    from concurrent.futures import ThreadPoolExecutor
-    from .utils import Console, Logger
 
     try:
         import importlib
@@ -717,11 +736,13 @@ def run_cwc_download(args):
         def tqdm_mod(iterable, **_kwargs):
             return iterable
 
-    base_output = os.path.join(args.output_dir, "cwc", "stations")
-    os.makedirs(base_output, exist_ok=True)
+    # Root CWC output directory; basin-specific subfolders are attached
+    # later once we know which stations are included in this run.
+    cwc_root = os.path.join(args.output_dir, "cwc")
+    os.makedirs(cwc_root, exist_ok=True)
     
     Console.is_quiet = getattr(args, "quiet", False)
-    logger = Logger(base_output)
+    logger = Logger(cwc_root)
     
     Console.section("Dataset: water_level (CWC)")
     logger.log("INFO", "Starting CWC water_level download")
@@ -761,9 +782,30 @@ def run_cwc_download(args):
     logger.log("INFO", f"Discovered {n_stations} CWC stations natively")
 
     # ---------------------------------------------------------
+    # Output folder: basin-aware when possible
+    # ---------------------------------------------------------
+    
+    # If all selected stations share the same basin name, place their
+    # station files under a <basin>/stations subfolder (mirrors WRIS).
+    basin_slug = ""
+    if not stations.empty and "basin" in stations.columns:
+        unique_basins = {
+            str(b).strip().lower().replace(" ", "_")
+            for b in stations["basin"].dropna()
+        }
+        if len(unique_basins) == 1:
+            basin_slug = next(iter(unique_basins))
+    
+    if basin_slug:
+        base_output = os.path.join(cwc_root, basin_slug, "stations")
+    else:
+        base_output = os.path.join(cwc_root, "stations")
+    os.makedirs(base_output, exist_ok=True)
+    
+    # ---------------------------------------------------------
     # Resume filter
     # ---------------------------------------------------------
-
+    
     ext = args.format.lower()
     all_codes = [str(row["code"]).strip() for _, row in stations.iterrows()]
 
@@ -840,9 +882,11 @@ def run_cwc_download(args):
             if not files:
                 Console.warn("No station files found for plotting")
             else:
+                image_root = str(args.output_dir) if getattr(args, "output_dir", None) else None
+
                 for f in tqdm_mod(files, desc="Plotting", unit="plot", dynamic_ncols=True, disable=Console.is_quiet):
                     try:
-                        plot_station(f)
+                        plot_station(f, image_root=image_root)
                     except Exception as pe:
                         logger.log("WARN", f"Plot failed for {f.name}: {str(pe)}")
                         
@@ -860,12 +904,38 @@ def run_cwc_download(args):
     if args.merge:
         from .merge import merge_dataset_folder
 
-        gpkg_path = os.path.join(args.output_dir, "cwc", "cwc_timeseries.gpkg")
+        # Derive an informative GeoPackage name using unique state/basin
+        # filters when possible (especially helpful when called via
+        # swift.fetch() on a subset of stations).
+        state_slug = ""
+        basin_slug = ""
+        if not stations.empty:
+            unique_states = {
+                str(s).strip().lower().replace(" ", "_")
+                for s in stations.get("state", pd.Series(dtype=object)).dropna()
+            }
+            unique_basins = {
+                str(b).strip().lower().replace(" ", "_")
+                for b in stations.get("basin", pd.Series(dtype=object)).dropna()
+            }
+            if len(unique_states) == 1:
+                state_slug = next(iter(unique_states))
+            if len(unique_basins) == 1:
+                basin_slug = next(iter(unique_basins))
+
+        name_parts = ["cwc_timeseries"]
+        if state_slug:
+            name_parts.append(state_slug)
+        if basin_slug:
+            name_parts.append(basin_slug)
+        gpkg_name = "_".join(name_parts) + ".gpkg"
+
+        gpkg_path = os.path.join(args.output_dir, "cwc", gpkg_name)
 
         if downloaded == 0 and os.path.exists(gpkg_path):
             Console.info("Using cached GeoPackage for CWC")
         else:
-            logger.log("INFO", "Merging CWC data to GeoPackage")
+            logger.log("INFO", f"Merging CWC data to GeoPackage: {gpkg_name}")
             merge_dataset_folder(base_output, gpkg_path, "cwc_timeseries")
 
     # ---------------------------------------------------------

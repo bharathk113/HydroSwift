@@ -42,7 +42,8 @@ def build_metadata(meta, dataset, source):
         md["rl_zero"] = meta.get("rl_zero")
         md["warning_level"] = meta.get("warning_level")
         md["danger_level"] = meta.get("danger_level")
-        md["hfl"] = meta.get("hfl")
+        md["hfl"] = meta.get("highestFlowLevel") or meta.get("hfl")
+        md["hfl_date"] = meta.get("highestFlowLevelDate") or meta.get("hfl_date")
 
     return md
 
@@ -219,7 +220,7 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
 
     import json
 
-    base_output = os.path.join(args.output_dir, args.basin.lower())
+    base_output = os.path.join(args.output_dir, "wris", args.basin.lower())
     os.makedirs(base_output, exist_ok=True)
     
     Console.is_quiet = getattr(args, "quiet", False)

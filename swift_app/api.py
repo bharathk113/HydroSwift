@@ -127,6 +127,11 @@ def _build_args(**kwargs):
 
 def _resolve_basin(basin):
     """Normalise basin input (int / number-string / name) to a basin name."""
+    if isinstance(basin, (list, tuple, set)):
+        raise ValueError(
+            "basin must be a single basin value here. "
+            "For multiple basins, pass a list to swift.wris.download()."
+        )
     if isinstance(basin, int):
         basin = str(basin)
     if basin in WRIS_BASINS:
@@ -189,6 +194,27 @@ def get_wris_data(
     >>> swift.get_wris_data(['discharge', 'rainfall'], basin=6,
     ...                     start_date='2020-01-01', merge=True)
     """
+    if isinstance(basin, (list, tuple, set)):
+        basins = list(basin)
+        if not basins:
+            raise ValueError("basin must include at least one basin")
+        for one_basin in basins:
+            get_wris_data(
+                var=var,
+                basin=one_basin,
+                station=station,
+                start_date=start_date,
+                end_date=end_date,
+                output_dir=output_dir,
+                format=format,
+                overwrite=overwrite,
+                merge=merge,
+                plot=plot,
+                delay=delay,
+                quiet=quiet,
+            )
+        return None
+
     datasets = _normalize_datasets_input(var)
     if not datasets:
         raise ValueError("var must specify at least one dataset")
@@ -231,14 +257,23 @@ def get_wris_data(
 
     run_wris_download(args, selected, client, basin_code)
 
+    # Optionally generate plots from the freshly downloaded WRIS output.
+    # We call the top-level plot() helper directly, pointing it at the
+    # exact basin folder used by the WRIS engine.
+    #
+    # NOTE: the local parameter is also called ``plot``, so we must look
+    # up the module-level function from globals() instead of calling the
+    # boolean flag by accident.
     if plot:
-        plot_args = _build_args(
-            basin=args.basin,
-            output_dir=str(Path(output_dir)),
-            plot_only=True,
-            dataset_flags=dataset_flags,
-        )
-        run_plot_only(plot_args)
+        _plot_func = globals().get("plot")
+        if callable(_plot_func):
+            basin_dir = Path(output_dir) / "wris" / str(basin_name).lower()
+            _plot_func(
+                input_dir=str(basin_dir),
+                datasets=datasets,
+                output_dir=None,
+                cwc=False,
+            )
 
     return None
 
@@ -332,7 +367,7 @@ def get_cwc_data(
 # Station discovery (internal; use swift.wris.stations / swift.cwc.stations)
 # ---------------------------------------------------------
 
-def wris_stations(basin, var="discharge", delay=0.25):
+def wris_stations(basin, var, delay=0.25):
     """
     List available WRIS stations in a basin.
 
@@ -341,7 +376,7 @@ def wris_stations(basin, var="discharge", delay=0.25):
     basin : str or int
         Basin name or number.
     var : str
-        Dataset variable (default ``'discharge'``).
+        Dataset variable (required, e.g. ``'discharge'``, ``'solar'``).
     delay : float
         Seconds between API requests.
 
@@ -349,6 +384,9 @@ def wris_stations(basin, var="discharge", delay=0.25):
     -------
     SwiftTable
     """
+    if var is None or str(var).strip() == "":
+        raise ValueError("var must be provided (for example: 'discharge' or 'solar').")
+
     if var in DATASET_ALIAS:
         dataset_flag = DATASET_ALIAS[var]
     else:
@@ -428,10 +466,14 @@ def wris_stations(basin, var="discharge", delay=0.25):
 
     df = pd.DataFrame(records)
     df = df.sort_values("station_code").reset_index(drop=True)
-    return SwiftTable(df.copy())
+    out = SwiftTable(df.copy())
+    out.attrs["source"] = "wris"
+    out.attrs["basin"] = basin_name
+    out.attrs["variable"] = var
+    return out
 
 
-def cwc_stations(station=None, basin=None, river=None, refresh=False):
+def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False):
     """
     Return CWC flood-forecast station metadata.
 
@@ -447,6 +489,8 @@ def cwc_stations(station=None, basin=None, river=None, refresh=False):
         Basin name filter (substring, case-insensitive).
     river : str, optional
         River name filter (substring, case-insensitive).
+    state : str, optional
+        State name filter (substring, case-insensitive).
     refresh : bool, default False
         If True, fetch fresh metadata from the CWC API (~2 min).
         Metadata is mostly static and only changes when a new HFL is
@@ -464,9 +508,21 @@ def cwc_stations(station=None, basin=None, river=None, refresh=False):
     >>> swift.cwc_stations(refresh=True)
     """
     df = get_cwc_station_metadata(
-        station=station, basin=basin, river=river, refresh=refresh,
+        station=station,
+        basin=basin,
+        river=river,
+        state=state,
+        refresh=refresh,
     )
-    return SwiftTable(df.copy())
+    out = SwiftTable(df.copy())
+    out.attrs["source"] = "cwc"
+    if basin is not None:
+        out.attrs["basin"] = basin
+    if state is not None:
+        out.attrs["state"] = state
+    if river is not None:
+        out.attrs["river"] = river
+    return out
 
 
 # ============================================================
@@ -527,13 +583,23 @@ class _WrisNamespace:
         )
 
     @staticmethod
-    def stations(basin, variable="discharge", delay=0.25):
+    def stations(basin, variable, delay=0.25, state=None):
         """List available WRIS stations in a basin.
 
         Returns
         -------
         SwiftTable
         """
+        if state is not None and str(state).strip() != "":
+            raise ValueError(
+                "state filtering is currently only supported for swift.cwc.stations(). "
+                "WRIS station discovery supports basin-level filtering only."
+            )
+        if variable is None or str(variable).strip() == "":
+            raise ValueError(
+                "variable is required for swift.wris.stations() "
+                "(for example: 'discharge' or 'solar')."
+            )
         return wris_stations(basin=basin, var=variable, delay=delay)
 
 
@@ -583,15 +649,20 @@ class _CwcNamespace:
         )
 
     @staticmethod
-    def stations(station=None, basin=None, river=None, refresh=False):
+    def stations(station=None, basin=None, river=None, state=None, refresh=False):
         """Return CWC flood-forecast station metadata.
 
         Returns
         -------
         SwiftTable
         """
-        return cwc_stations(station=station, basin=basin, river=river,
-                            refresh=refresh)
+        return cwc_stations(
+            station=station,
+            basin=basin,
+            river=river,
+            state=state,
+            refresh=refresh,
+        )
 
 
 wris = _WrisNamespace()
@@ -603,72 +674,117 @@ cwc_ns = _CwcNamespace()
 # ============================================================
 
 def fetch(
-    source,
-    basin=None,
-    station=None,
-    variable=None,
+    stations,
     *,
     output_dir="output",
     start_date="1950-01-01",
     end_date=None,
+    format="csv",
+    overwrite=False,
     merge=False,
     plot=False,
     quiet=False,
-    **kwargs,
+    delay=0.25,
+    refresh=False,
 ):
-    """Download data from WRIS or CWC with a single entry point.
+    """Download data for a station table returned by ``wris.stations`` / ``cwc.stations``.
 
     Parameters
     ----------
-    source : ``'wris'`` | ``'cwc'``
-        Data source to fetch from.
-    basin : str or int, optional
-        Basin (required for WRIS).
-    station : str or list[str], optional
-        Station code(s).
-    variable : str or list[str], optional
-        Dataset variable(s) (required for WRIS).
+    stations : pandas.DataFrame
+        Station table. For WRIS it should include ``station_code`` and
+        attrs: ``source='wris'``, ``basin``, ``variable``. For CWC it
+        should include ``code`` and attrs ``source='cwc'``.
     output_dir : str
         Root output directory.
     start_date, end_date : str
         ISO date strings.
-    merge, plot, quiet : bool
-    **kwargs
-        Forwarded to the underlying download function.
+    format : ``'csv'`` | ``'xlsx'``
+    overwrite, merge, plot, quiet : bool
+    delay : float
+        WRIS request delay in seconds.
+    refresh : bool
+        CWC metadata refresh flag before download.
     """
-    source = source.lower().strip()
+    if not isinstance(stations, pd.DataFrame):
+        raise TypeError(
+            "fetch() expects a pandas DataFrame/SwiftTable from "
+            "swift.wris.stations(...) or swift.cwc.stations(...)."
+        )
+
+    source = stations.attrs.get("source")
+    if not source:
+        if "station_code" in stations.columns:
+            source = "wris"
+        elif "code" in stations.columns:
+            source = "cwc"
+        else:
+            raise ValueError(
+                "Unable to infer data source from stations table. "
+                "Expected 'station_code' (WRIS) or 'code' (CWC) column."
+            )
+
+    source = str(source).lower().strip()
     if source == "wris":
-        if variable is None:
-            raise ValueError("variable is required for source='wris'")
-        if basin is None:
-            raise ValueError("basin is required for source='wris'")
+        if "station_code" not in stations.columns:
+            raise ValueError("WRIS stations table must include 'station_code' column.")
+        basin = stations.attrs.get("basin")
+        variable = stations.attrs.get("variable")
+        if basin is None or variable is None:
+            raise ValueError(
+                "WRIS station table is missing attrs 'basin' and/or 'variable'. "
+                "Build it using swift.wris.stations(basin=..., variable=...)."
+            )
+        station_codes = sorted(
+            {
+                str(code).strip()
+                for code in stations["station_code"].dropna().tolist()
+                if str(code).strip()
+            }
+        )
+        if not station_codes:
+            raise ValueError("WRIS station table has no valid station_code entries.")
         return wris.download(
             basin=basin,
             variable=variable,
-            station=station,
+            station=station_codes,
             start_date=start_date,
             end_date=end_date,
             output_dir=output_dir,
+            format=format,
+            overwrite=overwrite,
             merge=merge,
             plot=plot,
+            delay=delay,
             quiet=quiet,
-            **kwargs,
         )
-    elif source == "cwc":
+
+    if source == "cwc":
+        if "code" not in stations.columns:
+            raise ValueError("CWC stations table must include 'code' column.")
+        station_codes = sorted(
+            {
+                str(code).strip()
+                for code in stations["code"].dropna().tolist()
+                if str(code).strip()
+            }
+        )
+        if not station_codes:
+            raise ValueError("CWC station table has no valid code entries.")
         return cwc_ns.download(
-            station=station,
+            station=station_codes,
             start_date=start_date,
             end_date=end_date,
             output_dir=output_dir,
+            format=format,
+            overwrite=overwrite,
             merge=merge,
             plot=plot,
             quiet=quiet,
-            **kwargs,
+            refresh=refresh,
         )
-    else:
-        raise ValueError(
-            f"Unknown source: {source!r}. Use 'wris' or 'cwc'."
-        )
+
+    raise ValueError(f"Unknown stations source: {source!r}.")
 
 
 # ---------------------------------------------------------
@@ -679,9 +795,10 @@ def _resolve_mode_input_dir(mode, basin, output_dir):
     """Derive ``input_dir`` from *mode* and *basin* using SWIFT conventions."""
     base = Path(output_dir or "output")
     if mode == "wris":
+        wris_root = base / "wris"
         if basin is None:
-            return str(base)
-        return str(base / _resolve_basin(basin))
+            return str(wris_root)
+        return str(wris_root / str(_resolve_basin(basin)).lower())
     elif mode == "cwc":
         return str(base)
     raise ValueError(f"Unknown mode: {mode!r}. Use 'wris' or 'cwc'.")
@@ -721,8 +838,47 @@ def merge(
     """
     if variable is not None and datasets is None:
         datasets = variable if isinstance(variable, list) else [variable]
+    if isinstance(basin, (list, tuple, set)):
+        basins = list(basin)
+        if not basins:
+            raise ValueError("basin must include at least one basin")
+        for one_basin in basins:
+            try:
+                merge(
+                    input_dir=input_dir,
+                    datasets=datasets,
+                    output_dir=output_dir,
+                    mode=mode,
+                    basin=one_basin,
+                    variable=variable,
+                )
+            except ValueError as exc:
+                if "Basin directory not found" in str(exc):
+                    warnings.warn(
+                        f"Basin '{one_basin}' not found in input_dir='{input_dir}'. Skipping.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                    continue
+                raise
+        return None
     if mode is not None and input_dir is None:
         input_dir = _resolve_mode_input_dir(mode, basin, output_dir)
+    elif basin is not None and input_dir is not None and mode is None:
+        # Standalone WRIS merge with explicit basin selection:
+        # constrain merge to that basin under the provided input root.
+        input_root = Path(input_dir)
+        basin_name = str(_resolve_basin(basin)).lower()
+        wris_root = input_root / "wris"
+        if wris_root.exists() and wris_root.is_dir():
+            basin_dir = wris_root / basin_name
+        else:
+            basin_dir = input_root / basin_name
+        if not basin_dir.exists():
+            raise ValueError(
+                f"Basin directory not found for basin={basin!r} in input_dir={input_dir!r}"
+            )
+        input_dir = str(basin_dir)
     if input_dir is None:
         raise ValueError(
             "input_dir must be specified (or provide mode= to derive it)"
@@ -738,7 +894,17 @@ def merge(
         dataset_flags=dataset_flags,
         cwc=(mode == "cwc") if mode else False,
     )
-    run_merge_only(args)
+    try:
+        run_merge_only(args)
+    except PermissionError as exc:
+        raise ValueError(
+            f"output_dir is not writable: {output_dir!r}. "
+            "Choose a writable directory (for example, a path inside your workspace)."
+        ) from exc
+    except OSError as exc:
+        raise ValueError(
+            f"Unable to use output_dir={output_dir!r}: {exc}"
+        ) from exc
     return None
 
 
@@ -778,11 +944,51 @@ def plot(
     """
     if variable is not None and datasets is None:
         datasets = variable if isinstance(variable, list) else [variable]
+    if isinstance(basin, (list, tuple, set)):
+        basins = list(basin)
+        if not basins:
+            raise ValueError("basin must include at least one basin")
+        for one_basin in basins:
+            try:
+                plot(
+                    input_dir=input_dir,
+                    datasets=datasets,
+                    output_dir=output_dir,
+                    cwc=cwc,
+                    mode=mode,
+                    basin=one_basin,
+                    variable=variable,
+                )
+            except ValueError as exc:
+                if "Basin directory not found" in str(exc):
+                    warnings.warn(
+                        f"Basin '{one_basin}' not found in input_dir='{input_dir}'. Skipping.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                    continue
+                raise
+        return None
     if mode is not None:
         if mode == "cwc":
             cwc = True
         if input_dir is None:
             input_dir = _resolve_mode_input_dir(mode, basin, output_dir)
+    elif basin is not None and not cwc and input_dir is not None:
+        # Standalone WRIS plot with explicit basin selection:
+        # constrain plotting to that basin under the provided input root.
+        input_root = Path(input_dir)
+        basin_name = str(_resolve_basin(basin)).lower()
+        wris_root = input_root / "wris"
+        if wris_root.exists() and wris_root.is_dir():
+            basin_dir = wris_root / basin_name
+        else:
+            basin_dir = input_root / basin_name
+        if not basin_dir.exists():
+            raise ValueError(
+                f"Basin directory not found for basin={basin!r} in input_dir={input_dir!r}"
+            )
+        input_dir = str(basin_dir)
     if input_dir is None:
         raise ValueError(
             "input_dir must be specified (or provide mode= to derive it)"

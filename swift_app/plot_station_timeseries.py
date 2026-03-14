@@ -44,7 +44,10 @@ def load_swift_file(file_path):
     file_path = str(file_path)
 
     if file_path.endswith(".csv"):
-        df = pd.read_csv(file_path)
+        # New SWIFT CSVs start with a metadata header where each line
+        # begins with \"#\" followed by a standard CSV header row. Tell
+        # pandas to treat \"#\" lines as comments so they are skipped.
+        df = pd.read_csv(file_path, comment="#")
 
     elif file_path.endswith(".xlsx"):
         df = pd.read_excel(file_path)
@@ -85,7 +88,7 @@ def load_swift_file(file_path):
 # Plot single station
 # ============================================================
 
-def plot_station(file_path):
+def plot_station(file_path, image_root=None, include_images_subdir=True):
 
     file_path = Path(file_path)
 
@@ -118,7 +121,33 @@ def plot_station(file_path):
             dataset = "cwc"
             ylabel = "Water Level (m)"
 
-            out_dir = Path("images") / "cwc"
+            # For CWC, data live under either:
+            #   <output_dir>/cwc/stations/...                (legacy)
+            #   <output_dir>/cwc/<basin>/stations/...        (basin-aware)
+            # We place plots under:
+            #   <image_root|output_dir>/cwc/<basin>/images/  (default)
+            #   <image_root|output_dir>/cwc/images/          (when basin unknown)
+            # or, without images subdir:
+            #   <image_root|output_dir>/cwc/<basin>/         (standalone)
+            #   <image_root|output_dir>/cwc/
+
+            # Find the 'cwc' segment and optional basin name that follows.
+            cwc_idx = parts.index("cwc")
+            basin_name = None
+            if len(parts) > cwc_idx + 2 and parts[cwc_idx + 2] == "stations":
+                basin_name = parts[cwc_idx + 1]
+
+            base_root = Path(image_root) if image_root else Path(*parts[: cwc_idx])
+            cwc_root = base_root / "cwc"
+
+            if basin_name:
+                if include_images_subdir:
+                    out_dir = cwc_root / basin_name / "images"
+                else:
+                    out_dir = cwc_root / basin_name
+            else:
+                out_dir = cwc_root / "images" if include_images_subdir else cwc_root
+
             prefix = "CWC_"
 
         else:
@@ -137,7 +166,17 @@ def plot_station(file_path):
             else:
                 ylabel = df["unit"].iloc[0] if "unit" in df.columns else "Value"
 
-            out_dir = Path("images") / "wris" / basin / variable
+            # For WRIS, data live under: <output_dir>/wris/<basin>/<variable>/...
+            # We place plots under:
+            #   <image_root|output_dir>/wris/<basin>/images/<variable>/ (default)
+            # or
+            #   <image_root|output_dir>/wris/<basin>/<variable>/         (standalone plot output)
+            output_dir = Path(image_root) if image_root else file_path.parents[3]
+            wris_root = output_dir / "wris"
+            if include_images_subdir:
+                out_dir = wris_root / basin / "images" / variable
+            else:
+                out_dir = wris_root / basin / variable
             prefix = ""
 
         # ----------------------------------------------------
