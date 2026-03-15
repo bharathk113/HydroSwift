@@ -68,6 +68,10 @@ def test_wris_stations_populates_river_from_discovery_fallback(monkeypatch):
 
     assert len(out) == 1
     assert out.loc[0, "river"] == "River-X"
+    assert out.loc[0, "basin"] == "Godavari"
+    assert out.loc[0, "variable"] == "discharge"
+    assert out.attrs["basin"] == ["Godavari"]
+    assert out.attrs["variable"] == ["discharge"]
 
 
 def test_cwc_stations_refresh_uses_live_fetch(monkeypatch, tmp_path):
@@ -319,6 +323,78 @@ def test_wris_namespace_stations(monkeypatch):
 
     out = api_mod.wris.stations("Godavari", "discharge")
     assert len(out) == 1
+    assert "basin" in out.columns
+    assert "variable" in out.columns
+    assert out.loc[0, "basin"] == "Godavari"
+    assert out.loc[0, "variable"] == "discharge"
+
+
+def test_wris_stations_multi_basin_multi_variable(monkeypatch):
+    """wris.stations() with lists for basin and variable produces per-row columns."""
+    import swift_app.api as api_mod
+
+    call_log = []
+
+    class DummyClient:
+        def __init__(self, delay=0.25):
+            self.delay = delay
+
+        def get_basin_code(self, basin):
+            return {"Godavari": "5", "Krishna": "6"}[basin]
+
+        def get_tributaries(self, basin_code, dataset_code):
+            return []
+
+        def get_rivers(self, tributary_id, dataset_code):
+            return []
+
+        def get_agencies(self, tributary_id, localriver_id, dataset_code):
+            return []
+
+        def get_stations(self, tributary_id, localriver_id, agency_id, dataset_code):
+            return []
+
+        def get_metadata(self, station_code, dataset_code):
+            return {
+                "station_Name": f"Stn-{station_code}",
+                "latitude": 10.0,
+                "longitude": 20.0,
+            }
+
+    def fake_build_basin_structure(client, basin_code):
+        return [("t1", "r1")]
+
+    station_map = {
+        ("5", "SOLAR_RD"): ["S1", "S2"],
+        ("5", "DISCHARG"): ["S1", "S3"],
+        ("6", "SOLAR_RD"): ["S4"],
+        ("6", "DISCHARG"): ["S4", "S5"],
+    }
+
+    def fake_discover_stations(client, basin_structure, dataset_code, *a, **kw):
+        basin_code = client.get_basin_code(
+            "Godavari" if basin_structure == [("t1", "r1")] else "Krishna"
+        )
+        call_log.append((basin_code, dataset_code))
+        return station_map.get((basin_code, dataset_code), [])
+
+    monkeypatch.setattr(api_mod, "WrisClient", DummyClient)
+    monkeypatch.setattr(api_mod, "build_basin_structure", fake_build_basin_structure)
+    monkeypatch.setattr(api_mod, "discover_stations", fake_discover_stations)
+
+    out = api_mod.wris.stations(
+        basin=["Godavari", "Krishna"],
+        variable=["solar", "discharge"],
+    )
+
+    assert "basin" in out.columns
+    assert "variable" in out.columns
+    assert set(out["basin"].unique()) == {"Godavari", "Krishna"}
+    assert set(out["variable"].unique()) == {"solar", "discharge"}
+    assert out.attrs["basin"] == ["Godavari", "Krishna"]
+    assert out.attrs["variable"] == ["solar", "discharge"]
+    assert out.attrs["source"] == "wris"
+    assert len(out) > 0
 
 
 def test_wris_namespace_stations_requires_variable():
@@ -326,6 +402,20 @@ def test_wris_namespace_stations_requires_variable():
 
     with pytest.raises(ValueError, match="variable is required"):
         api_mod.wris.stations("Godavari", None)
+
+
+def test_wris_namespace_stations_empty_list_raises():
+    import swift_app.api as api_mod
+
+    with pytest.raises(ValueError, match="variable is required"):
+        api_mod.wris.stations("Godavari", [])
+
+
+def test_wris_namespace_stations_empty_string_raises():
+    import swift_app.api as api_mod
+
+    with pytest.raises(ValueError, match="variable is required"):
+        api_mod.wris.stations("Godavari", "")
 
 
 def test_cwc_namespace_stations(monkeypatch, tmp_path):
@@ -369,10 +459,14 @@ def test_fetch_dispatches_to_wris(monkeypatch, tmp_path):
     monkeypatch.setattr(api_mod, "WrisClient", DummyClient)
     monkeypatch.setattr(api_mod, "run_wris_download", fake_run_wris_download)
 
-    stations = api_mod.SwiftTable(pd.DataFrame({"station_code": ["ST001", "ST002"]}))
+    stations = api_mod.SwiftTable(pd.DataFrame({
+        "station_code": ["ST001", "ST002"],
+        "basin": ["Krishna", "Krishna"],
+        "variable": ["discharge", "discharge"],
+    }))
     stations.attrs["source"] = "wris"
-    stations.attrs["basin"] = "Krishna"
-    stations.attrs["variable"] = "discharge"
+    stations.attrs["basin"] = ["Krishna"]
+    stations.attrs["variable"] = ["discharge"]
 
     api_mod.fetch(stations, output_dir=tmp_path, quiet=True)
 
@@ -406,12 +500,98 @@ def test_fetch_invalid_input_type_raises():
         api_mod.fetch("invalid_source")
 
 
+def test_fetch_dispatches_multi_basin_variable_groups(monkeypatch, tmp_path):
+    """fetch() groups by (basin, variable) and dispatches each separately."""
+    import swift_app.api as api_mod
+
+    class DummyClient:
+        def __init__(self, delay=0.25):
+            self.delay = delay
+
+        def check_api(self):
+            return True
+
+        def get_basin_code(self, basin):
+            return {"Godavari": "5", "Krishna": "6"}[basin]
+
+    calls = []
+
+    def fake_run_wris_download(args, selected, client, basin_code):
+        calls.append({
+            "basin": args.basin,
+            "basin_code": basin_code,
+            "selected": selected,
+            "stations": getattr(args, "stations", None),
+        })
+
+    monkeypatch.setattr(api_mod, "WrisClient", DummyClient)
+    monkeypatch.setattr(api_mod, "run_wris_download", fake_run_wris_download)
+
+    stations = api_mod.SwiftTable(pd.DataFrame({
+        "station_code": ["S1", "S2", "S3", "S4"],
+        "basin": ["Godavari", "Godavari", "Krishna", "Krishna"],
+        "variable": ["solar", "solar", "discharge", "discharge"],
+    }))
+    stations.attrs["source"] = "wris"
+    stations.attrs["basin"] = ["Godavari", "Krishna"]
+    stations.attrs["variable"] = ["solar", "discharge"]
+
+    api_mod.fetch(stations, output_dir=tmp_path, quiet=True)
+
+    assert len(calls) == 2
+    basins_dispatched = {c["basin"] for c in calls}
+    assert basins_dispatched == {"Godavari", "Krishna"}
+    for c in calls:
+        if c["basin"] == "Godavari":
+            assert c["basin_code"] == "5"
+            assert "SOLAR_RD" in c["selected"]
+            assert sorted(c["stations"]) == ["S1", "S2"]
+        else:
+            assert c["basin_code"] == "6"
+            assert "DISCHARG" in c["selected"]
+            assert sorted(c["stations"]) == ["S3", "S4"]
+
+
+def test_fetch_wris_legacy_scalar_attrs(monkeypatch, tmp_path):
+    """fetch() still works with old-style scalar attrs (backward compat)."""
+    import swift_app.api as api_mod
+
+    class DummyClient:
+        def __init__(self, delay=0.25):
+            self.delay = delay
+
+        def check_api(self):
+            return True
+
+        def get_basin_code(self, basin):
+            return "6"
+
+    calls = {}
+
+    def fake_run_wris_download(args, selected, client, basin_code):
+        calls["basin"] = args.basin
+        calls["selected"] = selected
+
+    monkeypatch.setattr(api_mod, "WrisClient", DummyClient)
+    monkeypatch.setattr(api_mod, "run_wris_download", fake_run_wris_download)
+
+    stations = api_mod.SwiftTable(pd.DataFrame({"station_code": ["ST001"]}))
+    stations.attrs["source"] = "wris"
+    stations.attrs["basin"] = "Krishna"
+    stations.attrs["variable"] = "discharge"
+
+    api_mod.fetch(stations, output_dir=tmp_path, quiet=True)
+
+    assert calls["basin"] == "Krishna"
+    assert "DISCHARG" in calls["selected"]
+
+
 def test_fetch_wris_missing_attrs_raises():
     import swift_app.api as api_mod
 
     stations = api_mod.SwiftTable(pd.DataFrame({"station_code": ["ST001"]}))
     stations.attrs["source"] = "wris"
-    with pytest.raises(ValueError, match="missing attrs"):
+    with pytest.raises(ValueError, match="missing"):
         api_mod.fetch(stations)
 
 
@@ -432,8 +612,7 @@ def test_fetch_cwc_missing_code_column_raises():
 def test_merge_with_mode_derives_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
-    basin_dir = tmp_path / "wris" / "krishna"
-    basin_dir.mkdir(parents=True)
+    (tmp_path / "wris" / "krishna").mkdir(parents=True)
 
     calls = {}
 
@@ -442,12 +621,12 @@ def test_merge_with_mode_derives_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_merge_only", fake_run_merge_only)
 
-    api_mod.merge(mode="wris", basin="Krishna", output_dir=str(tmp_path))
+    api_mod.merge(mode="wris", output_dir=str(tmp_path))
 
-    assert calls["input_dir"] == str(basin_dir)
+    assert calls["input_dir"] == str(tmp_path)
 
 
-def test_merge_with_multiple_basins_sequential(monkeypatch, tmp_path):
+def test_merge_discovers_basins_from_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -462,49 +641,37 @@ def test_merge_with_multiple_basins_sequential(monkeypatch, tmp_path):
 
     api_mod.merge(
         input_dir=str(tmp_path),
-        basin=["Krishna", "Godavari"],
-        datasets=["solar"],
+        variable=["solar"],
         output_dir=str(tmp_path / "merged"),
     )
 
-    assert calls == [
-        str(tmp_path / "wris" / "krishna"),
-        str(tmp_path / "wris" / "godavari"),
-    ]
+    assert calls == [str(tmp_path)]
 
 
-def test_merge_with_multiple_basins_skips_missing(monkeypatch, tmp_path):
+def test_merge_cwc_no_basin_warning(monkeypatch, tmp_path):
+    """merge(mode='cwc') runs once with no basin/datasets warning."""
     import swift_app.api as api_mod
 
-    (tmp_path / "wris" / "krishna").mkdir(parents=True)
-    (tmp_path / "wris" / "godavari").mkdir(parents=True)
+    (tmp_path / "cwc" / "godavari" / "stations").mkdir(parents=True)
 
     calls = []
 
     def fake_run_merge_only(args):
-        calls.append(args.input_dir)
+        calls.append((args.input_dir, getattr(args, "cwc", False)))
 
     monkeypatch.setattr(api_mod, "run_merge_only", fake_run_merge_only)
 
-    with pytest.warns(UserWarning, match="Narmada"):
-        api_mod.merge(
-            input_dir=str(tmp_path),
-            basin=["Krishna", "Godavari", "Narmada"],
-            datasets=["solar"],
-            output_dir=str(tmp_path / "merged"),
-        )
+    api_mod.merge(mode="cwc", input_dir=str(tmp_path), output_dir=str(tmp_path))
 
-    assert calls == [
-        str(tmp_path / "wris" / "krishna"),
-        str(tmp_path / "wris" / "godavari"),
-    ]
+    assert len(calls) == 1
+    assert calls[0][0] == str(tmp_path)
+    assert calls[0][1] is True
 
 
 def test_plot_with_mode_derives_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
-    basin_dir = tmp_path / "wris" / "krishna"
-    basin_dir.mkdir(parents=True)
+    (tmp_path / "wris" / "krishna").mkdir(parents=True)
 
     calls = {}
 
@@ -514,13 +681,13 @@ def test_plot_with_mode_derives_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
-    api_mod.plot(mode="wris", basin="Krishna", output_dir=str(tmp_path))
+    api_mod.plot(mode="wris", output_dir=str(tmp_path))
 
-    assert calls["input_dir"] == str(basin_dir)
+    assert calls["input_dir"] == str(tmp_path)
     assert calls["cwc"] is False
 
 
-def test_plot_with_multiple_basins_sequential(monkeypatch, tmp_path):
+def test_plot_discovers_basins_from_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -535,22 +702,17 @@ def test_plot_with_multiple_basins_sequential(monkeypatch, tmp_path):
 
     api_mod.plot(
         input_dir=str(tmp_path),
-        basin=["krishna", "godavari"],
-        datasets=["solar", "sediment"],
+        variable=["solar", "sediment"],
         output_dir=str(tmp_path / "plots"),
     )
 
-    assert calls == [
-        str(tmp_path / "wris" / "krishna"),
-        str(tmp_path / "wris" / "godavari"),
-    ]
+    assert calls == [str(tmp_path)]
 
 
-def test_plot_with_multiple_basins_skips_missing(monkeypatch, tmp_path):
+def test_plot_cwc_discovers_from_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
-    (tmp_path / "wris" / "krishna").mkdir(parents=True)
-    (tmp_path / "wris" / "godavari").mkdir(parents=True)
+    (tmp_path / "cwc" / "godavari" / "stations").mkdir(parents=True)
 
     calls = []
 
@@ -559,18 +721,9 @@ def test_plot_with_multiple_basins_skips_missing(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
-    with pytest.warns(UserWarning, match="Narmada"):
-        api_mod.plot(
-            input_dir=str(tmp_path),
-            basin=["krishna", "godavari", "Narmada"],
-            datasets=["solar", "sediment"],
-            output_dir=str(tmp_path / "plots"),
-        )
+    api_mod.plot(mode="cwc", input_dir=str(tmp_path), output_dir=str(tmp_path))
 
-    assert calls == [
-        str(tmp_path / "wris" / "krishna"),
-        str(tmp_path / "wris" / "godavari"),
-    ]
+    assert calls == [str(tmp_path)]
 
 
 def test_plot_cwc_mode_sets_cwc_flag(monkeypatch, tmp_path):
@@ -588,16 +741,15 @@ def test_plot_cwc_mode_sets_cwc_flag(monkeypatch, tmp_path):
     assert calls["cwc"] is True
 
 
-def test_plot_with_explicit_missing_basin_raises(tmp_path):
+def test_plot_input_dir_must_exist(tmp_path):
     import swift_app.api as api_mod
 
-    (tmp_path / "wris" / "krishna").mkdir(parents=True)
+    missing = tmp_path / "nonexistent"
+    assert not missing.exists()
 
-    with pytest.raises(ValueError, match="Basin directory not found"):
+    with pytest.raises(ValueError, match="input_dir does not exist"):
         api_mod.plot(
-            input_dir=str(tmp_path),
-            basin="Godavari",
-            datasets=["discharge"],
+            input_dir=str(missing),
             output_dir=str(tmp_path / "plots"),
         )
 

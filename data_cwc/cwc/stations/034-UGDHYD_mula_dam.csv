@@ -1,0 +1,20 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 034-UGDHYD
+# station_name: Mula Dam
+# latitude: 19.35
+# longitude: 74.6
+# river: Mula
+# rl_zero: 0.0
+# warning_level: nan
+# danger_level: nan
+# hfl: nan
+# hfl_date: nan
+station_code,time,wse,water_depth,unit,lat,lon
+034-UGDHYD,2024-01-01 08:00:00,549.04,549.04,m,19.35,74.6
+034-UGDHYD,2024-01-02 08:00:00,549.02,549.02,m,19.35,74.6
+034-UGDHYD,2024-01-03 08:00:00,549.0,549.0,m,19.35,74.6
+034-UGDHYD,2024-01-04 08:00:00,548.99,548.99,m,19.35,74.6
+034-UGDHYD,2024-01-05 08:00:00,548.98,548.98,m,19.35,74.6
+034-UGDHYD,2024-01-06 08:00:00,548.96,548.96,m,19.35,74.6

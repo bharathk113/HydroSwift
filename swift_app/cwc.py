@@ -538,6 +538,15 @@ def fetch_station_data(code, start_date=None, end_date=None, retries=3):
 
     return None
 
+def _normalize_list_filter(value):
+    """Return a list of non-empty strings from str or list/tuple/set."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    return [str(v).strip() for v in value if str(v).strip()]
+
+
 def get_cwc_station_metadata(
     station=None, basin=None, river=None, state=None, refresh=False
 ):
@@ -548,32 +557,40 @@ def get_cwc_station_metadata(
     ----------
     station : str, optional
         Station code or partial name to search for.
-    basin : str, optional
-        Basin name filter (substring match).
+    basin : str or list[str], optional
+        Basin name filter (substring match). Pass a list for multiple basins.
     river : str, optional
         River name filter (substring match).
-    state : str, optional
-        State name filter (substring match).
+    state : str or list[str], optional
+        State name filter (substring match). Pass a list for multiple states.
     refresh : bool, default False
         If True, fetch fresh metadata from the CWC FFS API.
     """
     stations = load_station_table(refresh=refresh)
     df = stations.copy()
 
-    if basin:
-        df = df[df["basin"].str.lower().str.contains(basin.lower(), na=False)]
+    basins = _normalize_list_filter(basin)
+    if basins:
+        mask = pd.Series(False, index=df.index)
+        for b in basins:
+            mask |= df["basin"].astype(str).str.lower().str.contains(b.lower(), na=False)
+        df = df[mask]
 
     if river:
-        df = df[df["river"].str.lower().str.contains(river.lower(), na=False)]
+        df = df[df["river"].astype(str).str.lower().str.contains(river.lower(), na=False)]
 
-    if state:
-        df = df[df["state"].str.lower().str.contains(state.lower(), na=False)]
+    states = _normalize_list_filter(state)
+    if states:
+        mask = pd.Series(False, index=df.index)
+        for s in states:
+            mask |= df["state"].astype(str).str.lower().str.contains(s.lower(), na=False)
+        df = df[mask]
 
     if station:
         q = str(station).lower()
         df = df[
-            df["code"].str.lower().str.contains(q, na=False)
-            | df["name"].str.lower().str.contains(q, na=False)
+            df["code"].astype(str).str.lower().str.contains(q, na=False)
+            | df["name"].astype(str).str.lower().str.contains(q, na=False)
         ]
 
     if df.empty:
@@ -785,17 +802,19 @@ def run_cwc_download(args):
     # Output folder: basin-aware when possible
     # ---------------------------------------------------------
     
-    # If all selected stations share the same basin name, place their
-    # station files under a <basin>/stations subfolder (mirrors WRIS).
+    # When called from fetch() with a basin-column table, args.basin is set.
+    # Otherwise infer from the filtered station table if all share one basin.
     basin_slug = ""
-    if not stations.empty and "basin" in stations.columns:
+    if getattr(args, "basin", None):
+        basin_slug = str(args.basin).strip().lower().replace(" ", "_")
+    elif not stations.empty and "basin" in stations.columns:
         unique_basins = {
             str(b).strip().lower().replace(" ", "_")
             for b in stations["basin"].dropna()
         }
         if len(unique_basins) == 1:
             basin_slug = next(iter(unique_basins))
-    
+
     if basin_slug:
         base_output = os.path.join(cwc_root, basin_slug, "stations")
     else:
@@ -825,10 +844,11 @@ def run_cwc_download(args):
     if skipped > 0:
         Console.warn(f"Stations skipped (already downloaded): {skipped}")
         if not Console.is_quiet:
-            print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
+            print(f"{Console.ITALIC}Tip: call with overwrite=True to refresh data.{Console.RESET}")
         logger.log("INFO", f"Skipped {skipped} existing stations")
 
     downloaded = 0
+    downloaded_codes = []
     workers = min(32, max(8, (os.cpu_count() or 1) * 4))
 
     # ---------------------------------------------------------
@@ -859,6 +879,7 @@ def run_cwc_download(args):
                 result, stcode = f.result()
                 if result is True:
                     downloaded += 1
+                    downloaded_codes.append(str(stcode).strip())
                     logger.log("SUCCESS", f"Downloaded {stcode}")
                 elif result is False or result is None:
                     logger.log("WARN", f"Failed or empty data for {stcode}")
@@ -902,41 +923,51 @@ def run_cwc_download(args):
     # ---------------------------------------------------------
 
     if args.merge:
-        from .merge import merge_dataset_folder
+        from .merge import merge_dataset_folder, merge_dataset_files
 
-        # Derive an informative GeoPackage name using unique state/basin
-        # filters when possible (especially helpful when called via
-        # swift.fetch() on a subset of stations).
-        state_slug = ""
+        # Basin-aware, time-period-aware GeoPackage name (like WRIS).
+        # Format: cwc_waterlevel_<basin>_<start_date>_<end_date>.gpkg
         basin_slug = ""
-        if not stations.empty:
-            unique_states = {
-                str(s).strip().lower().replace(" ", "_")
-                for s in stations.get("state", pd.Series(dtype=object)).dropna()
-            }
+        if getattr(args, "basin", None):
+            basin_slug = str(args.basin).strip().lower().replace(" ", "_")
+        elif not stations.empty and "basin" in stations.columns:
             unique_basins = {
                 str(b).strip().lower().replace(" ", "_")
-                for b in stations.get("basin", pd.Series(dtype=object)).dropna()
+                for b in stations["basin"].dropna()
             }
-            if len(unique_states) == 1:
-                state_slug = next(iter(unique_states))
             if len(unique_basins) == 1:
                 basin_slug = next(iter(unique_basins))
 
-        name_parts = ["cwc_timeseries"]
-        if state_slug:
-            name_parts.append(state_slug)
+        start_slug = (str(args.start_date)[:10] if args.start_date else "1950-01-01")
+        end_slug = (str(args.end_date)[:10] if args.end_date else _time.strftime("%Y-%m-%d"))
+
+        name_parts = ["cwc_waterlevel"]
         if basin_slug:
             name_parts.append(basin_slug)
+        name_parts.extend([start_slug, end_slug])
         gpkg_name = "_".join(name_parts) + ".gpkg"
 
         gpkg_path = os.path.join(args.output_dir, "cwc", gpkg_name)
 
         if downloaded == 0 and os.path.exists(gpkg_path):
-            Console.info("Using cached GeoPackage for CWC")
-        else:
-            logger.log("INFO", f"Merging CWC data to GeoPackage: {gpkg_name}")
-            merge_dataset_folder(base_output, gpkg_path, "cwc_timeseries")
+            Console.info(f"Using cached GeoPackage for CWC ({start_slug} to {end_slug})")
+        elif downloaded > 0:
+            # Merge only files downloaded in this run so the GeoPackage is
+            # time-period aware and does not include stale files.
+            ext = args.format.lower()
+            merge_files = []
+            for code in downloaded_codes:
+                pattern = os.path.join(base_output, f"{code}_*.{ext}")
+                merge_files.extend(glob.glob(pattern))
+
+            if not merge_files:
+                logger.log("WARN", "No station files found to merge for current run")
+            else:
+                logger.log(
+                    "INFO",
+                    f"Merging {len(merge_files)} CWC file(s) to GeoPackage: {gpkg_name}",
+                )
+                merge_dataset_files(merge_files, gpkg_path, "cwc_waterlevel")
 
     # ---------------------------------------------------------
     # Summary table (mirrors WRIS format)

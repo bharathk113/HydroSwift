@@ -1,0 +1,60 @@
+[2026-03-15 14:42:51] [INFO] Starting WRIS download for basin: Narmada
+[2026-03-15 14:43:10] [INFO] Processing dataset: sediment
+[2026-03-15 14:43:10] [SUCCESS] Downloaded 009-ndbhp -> 009-ndbhp_Manot_SEDIM.csv
+[2026-03-15 14:43:10] [SUCCESS] Downloaded 016-NDBHP -> 016-NDBHP_Narmadapuram_SEDIM.csv
+[2026-03-15 14:43:10] [SUCCESS] Downloaded 013 NDBHP -> 013 NDBHP_ Sandia_SEDIM.csv
+[2026-03-15 14:43:16] [WARN] No data returned for station: 006-TDSURAT
+[2026-03-15 14:43:16] [WARN] No data returned for station: 004-NDBHP
+[2026-03-15 14:43:16] [WARN] No data returned for station: 01 02 17 002
+[2026-03-15 14:43:16] [INFO] Merging sediment to GeoPackage
+[2026-03-15 14:43:16] [INFO] Finished sediment: Downloaded 3, Skipped 0 in 6.7s
+[2026-03-15 14:44:01] [INFO] Starting WRIS download for basin: Narmada
+[2026-03-15 14:44:09] [INFO] Processing dataset: sediment
+[2026-03-15 14:44:10] [SUCCESS] Downloaded 006-TDSURAT -> 006-TDSURAT_CHANWADA_SEDIM.csv
+[2026-03-15 14:44:10] [SUCCESS] Downloaded 009-ndbhp -> 009-ndbhp_Manot_SEDIM.csv
+[2026-03-15 14:44:10] [SUCCESS] Downloaded 016-NDBHP -> 016-NDBHP_Narmadapuram_SEDIM.csv
+[2026-03-15 14:44:10] [SUCCESS] Downloaded 013 NDBHP -> 013 NDBHP_ Sandia_SEDIM.csv
+[2026-03-15 14:44:16] [WARN] No data returned for station: 004-NDBHP
+[2026-03-15 14:44:16] [WARN] No data returned for station: 01 02 17 002
+[2026-03-15 14:44:16] [INFO] Merging sediment to GeoPackage
+[2026-03-15 14:44:16] [INFO] Finished sediment: Downloaded 4, Skipped 0 in 6.8s
+[2026-03-15 14:50:09] [INFO] Starting WRIS download for basin: Narmada
+[2026-03-15 14:50:17] [INFO] Processing dataset: sediment
+[2026-03-15 14:50:18] [SUCCESS] Downloaded 013 NDBHP -> 013 NDBHP_ Sandia_SEDIM.csv
+[2026-03-15 14:50:18] [SUCCESS] Downloaded 009-ndbhp -> 009-ndbhp_Manot_SEDIM.csv
+[2026-03-15 14:50:18] [SUCCESS] Downloaded 016-NDBHP -> 016-NDBHP_Narmadapuram_SEDIM.csv
+[2026-03-15 14:50:24] [WARN] No data returned for station: 006-TDSURAT
+[2026-03-15 14:50:24] [WARN] No data returned for station: 01 02 17 002
+[2026-03-15 14:50:24] [WARN] No data returned for station: 004-NDBHP
+[2026-03-15 14:50:24] [INFO] Merging sediment to GeoPackage
+[2026-03-15 14:50:24] [INFO] Finished sediment: Downloaded 3, Skipped 0 in 6.8s
+[2026-03-15 14:55:49] [INFO] Starting WRIS download for basin: Narmada
+[2026-03-15 14:55:58] [INFO] Processing dataset: sediment
+[2026-03-15 14:55:58] [SUCCESS] Downloaded 016-NDBHP -> 016-NDBHP_Narmadapuram_SEDIM.csv
+[2026-03-15 14:55:58] [SUCCESS] Downloaded 013 NDBHP -> 013 NDBHP_ Sandia_SEDIM.csv
+[2026-03-15 14:55:58] [SUCCESS] Downloaded 009-ndbhp -> 009-ndbhp_Manot_SEDIM.csv
+[2026-03-15 14:56:04] [WARN] No data returned for station: 004-NDBHP
+[2026-03-15 14:56:04] [WARN] No data returned for station: 01 02 17 002
+[2026-03-15 14:56:04] [WARN] No data returned for station: 006-TDSURAT
+[2026-03-15 14:56:04] [INFO] Merging sediment to GeoPackage
+[2026-03-15 14:56:04] [INFO] Finished sediment: Downloaded 3, Skipped 0 in 6.8s
+[2026-03-15 15:00:55] [INFO] Starting WRIS download for basin: Narmada
+[2026-03-15 15:01:03] [INFO] Processing dataset: sediment
+[2026-03-15 15:01:04] [SUCCESS] Downloaded 013 NDBHP -> 013 NDBHP_ Sandia_SEDIM.csv
+[2026-03-15 15:01:04] [SUCCESS] Downloaded 016-NDBHP -> 016-NDBHP_Narmadapuram_SEDIM.csv
+[2026-03-15 15:01:04] [SUCCESS] Downloaded 009-ndbhp -> 009-ndbhp_Manot_SEDIM.csv
+[2026-03-15 15:01:10] [WARN] No data returned for station: 006-TDSURAT
+[2026-03-15 15:01:10] [WARN] No data returned for station: 004-NDBHP
+[2026-03-15 15:01:10] [WARN] No data returned for station: 01 02 17 002
+[2026-03-15 15:01:10] [INFO] Merging 3 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 15:01:10] [INFO] Finished sediment: Downloaded 3, Skipped 0 in 6.7s
+[2026-03-15 15:02:10] [INFO] Starting WRIS download for basin: Narmada
+[2026-03-15 15:02:18] [INFO] Processing dataset: sediment
+[2026-03-15 15:02:19] [SUCCESS] Downloaded 006-TDSURAT -> 006-TDSURAT_CHANWADA_SEDIM.csv
+[2026-03-15 15:02:19] [SUCCESS] Downloaded 013 NDBHP -> 013 NDBHP_ Sandia_SEDIM.csv
+[2026-03-15 15:02:19] [SUCCESS] Downloaded 016-NDBHP -> 016-NDBHP_Narmadapuram_SEDIM.csv
+[2026-03-15 15:02:19] [SUCCESS] Downloaded 009-ndbhp -> 009-ndbhp_Manot_SEDIM.csv
+[2026-03-15 15:02:25] [WARN] No data returned for station: 004-NDBHP
+[2026-03-15 15:02:25] [WARN] No data returned for station: 01 02 17 002
+[2026-03-15 15:02:25] [INFO] Merging 4 file(s) to GeoPackage (2024-04-01 to 2025-05-07)
+[2026-03-15 15:02:25] [INFO] Finished sediment: Downloaded 4, Skipped 0 in 6.8s

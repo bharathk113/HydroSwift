@@ -1,0 +1,64 @@
+[2026-03-15 20:01:46] [INFO] Starting WRIS download for basin: Krishna
+[2026-03-15 20:02:15] [INFO] Processing dataset: solar_radiation
+[2026-03-15 20:02:16] [SUCCESS] Downloaded 7D90291A -> 7D90291A_Prakasam Barrage APSW_SOLAR_RD.csv
+[2026-03-15 20:02:16] [SUCCESS] Downloaded Rukadi -> Rukadi_Rukadi_SOLAR_RD.csv
+[2026-03-15 20:02:16] [SUCCESS] Downloaded KK3GMNB291 -> KK3GMNB291_Deodurga_SOLAR_RD.csv
+[2026-03-15 20:02:16] [SUCCESS] Downloaded KK3GMNB353 -> KK3GMNB353_Sindhanur_SOLAR_RD.csv
+[2026-03-15 20:02:16] [SUCCESS] Downloaded Patryachiwad -> Patryachiwad_Patryachiwadi_SOLAR_RD.csv
+[2026-03-15 20:02:16] [INFO] Merging 5 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 20:02:16] [INFO] Finished solar_radiation: Downloaded 5, Skipped 0 in 0.8s
+[2026-03-15 20:02:16] [INFO] Processing dataset: sediment
+[2026-03-15 20:02:16] [SUCCESS] Downloaded 002-UKDPUNE -> 002-UKDPUNE_Warunji_SEDIM.csv
+[2026-03-15 20:02:17] [SUCCESS] Downloaded 003-UKDPUNE -> 003-UKDPUNE_Samdoli (Seasonal)_SEDIM.csv
+[2026-03-15 20:02:23] [WARN] No data returned for station: 002-CDBNG
+[2026-03-15 20:02:23] [WARN] No data returned for station: 004-CDBNG
+[2026-03-15 20:02:23] [WARN] No data returned for station: 003-CDBNG
+[2026-03-15 20:02:23] [WARN] No data returned for station: 001-CDBNG
+[2026-03-15 20:02:23] [WARN] No data returned for station: 006-UKDPUNE
+[2026-03-15 20:02:23] [WARN] No data returned for station: 005-cdbng
+[2026-03-15 20:02:23] [WARN] No data returned for station: 009-CDBNG
+[2026-03-15 20:02:23] [SUCCESS] Downloaded 011-cdbmg -> 011-cdbmg_HARIHARAPURA_SEDIM.csv
+[2026-03-15 20:02:23] [WARN] No data returned for station: 011-LKdhyd
+[2026-03-15 20:02:23] [SUCCESS] Downloaded 022-LKDHYD -> 022-LKDHYD_Madhira_SEDIM.csv
+[2026-03-15 20:02:23] [SUCCESS] Downloaded 042-UKD PUNE -> 042-UKD PUNE_NANDRE_SEDIM.csv
+[2026-03-15 20:02:29] [WARN] No data returned for station: 021-LKDHYD
+[2026-03-15 20:02:29] [WARN] No data returned for station: 013-lkdhyd
+[2026-03-15 20:02:29] [WARN] No data returned for station: 014-lkdhyd
+[2026-03-15 20:02:29] [WARN] No data returned for station: 023-LKDHYD
+[2026-03-15 20:02:29] [WARN] No data returned for station: 029-LKDHYD
+[2026-03-15 20:02:30] [WARN] No data returned for station: 049-CDBNG
+[2026-03-15 20:02:30] [WARN] No data returned for station: 036-CDBNG
+[2026-03-15 20:02:30] [INFO] Merging 5 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 20:02:30] [INFO] Finished sediment: Downloaded 5, Skipped 0 in 13.6s
+[2026-03-15 20:03:25] [INFO] Starting WRIS download for basin: Krishna
+[2026-03-15 20:03:32] [INFO] Processing dataset: solar_radiation
+[2026-03-15 20:03:33] [SUCCESS] Downloaded Rukadi -> Rukadi_Rukadi_SOLAR_RD.csv
+[2026-03-15 20:03:33] [SUCCESS] Downloaded KK3GMNB291 -> KK3GMNB291_Deodurga_SOLAR_RD.csv
+[2026-03-15 20:03:33] [SUCCESS] Downloaded KK3GMNB353 -> KK3GMNB353_Sindhanur_SOLAR_RD.csv
+[2026-03-15 20:03:33] [SUCCESS] Downloaded 7D90291A -> 7D90291A_Prakasam Barrage APSW_SOLAR_RD.csv
+[2026-03-15 20:03:33] [SUCCESS] Downloaded Patryachiwad -> Patryachiwad_Patryachiwadi_SOLAR_RD.csv
+[2026-03-15 20:03:33] [INFO] Merging 5 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 20:03:33] [INFO] Finished solar_radiation: Downloaded 5, Skipped 0 in 1.0s
+[2026-03-15 20:03:33] [INFO] Processing dataset: sediment
+[2026-03-15 20:03:34] [SUCCESS] Downloaded 002-UKDPUNE -> 002-UKDPUNE_Warunji_SEDIM.csv
+[2026-03-15 20:03:34] [SUCCESS] Downloaded 003-UKDPUNE -> 003-UKDPUNE_Samdoli (Seasonal)_SEDIM.csv
+[2026-03-15 20:03:40] [WARN] No data returned for station: 001-CDBNG
+[2026-03-15 20:03:40] [WARN] No data returned for station: 003-CDBNG
+[2026-03-15 20:03:40] [WARN] No data returned for station: 004-CDBNG
+[2026-03-15 20:03:40] [WARN] No data returned for station: 002-CDBNG
+[2026-03-15 20:03:40] [WARN] No data returned for station: 005-cdbng
+[2026-03-15 20:03:40] [WARN] No data returned for station: 006-UKDPUNE
+[2026-03-15 20:03:40] [SUCCESS] Downloaded 011-cdbmg -> 011-cdbmg_HARIHARAPURA_SEDIM.csv
+[2026-03-15 20:03:41] [WARN] No data returned for station: 011-LKdhyd
+[2026-03-15 20:03:41] [WARN] No data returned for station: 009-CDBNG
+[2026-03-15 20:03:41] [SUCCESS] Downloaded 022-LKDHYD -> 022-LKDHYD_Madhira_SEDIM.csv
+[2026-03-15 20:03:41] [SUCCESS] Downloaded 042-UKD PUNE -> 042-UKD PUNE_NANDRE_SEDIM.csv
+[2026-03-15 20:03:47] [WARN] No data returned for station: 021-LKDHYD
+[2026-03-15 20:03:47] [WARN] No data returned for station: 014-lkdhyd
+[2026-03-15 20:03:47] [WARN] No data returned for station: 013-lkdhyd
+[2026-03-15 20:03:47] [WARN] No data returned for station: 023-LKDHYD
+[2026-03-15 20:03:47] [WARN] No data returned for station: 029-LKDHYD
+[2026-03-15 20:03:47] [WARN] No data returned for station: 049-CDBNG
+[2026-03-15 20:03:47] [WARN] No data returned for station: 036-CDBNG
+[2026-03-15 20:03:47] [INFO] Merging 5 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 20:03:47] [INFO] Finished sediment: Downloaded 5, Skipped 0 in 14.2s

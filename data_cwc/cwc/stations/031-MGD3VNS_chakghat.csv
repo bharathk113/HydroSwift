@@ -1,0 +1,17 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 031-MGD3VNS
+# station_name: Chakghat
+# latitude: 25.03333333333333
+# longitude: 81.73472222222222
+# river: Tons
+# rl_zero: 85.0
+# warning_level: nan
+# danger_level: nan
+# hfl: 96.0
+# hfl_date: 2025-07-18
+station_code,time,wse,water_depth,unit,lat,lon
+031-MGD3VNS,2024-01-01 08:00:00,90.3,5.299999999999997,m,25.03333333333333,81.73472222222222
+031-MGD3VNS,2024-01-01 13:00:00,90.3,5.299999999999997,m,25.03333333333333,81.73472222222222
+031-MGD3VNS,2024-01-01 18:00:00,90.3,5.299999999999997,m,25.03333333333333,81.73472222222222

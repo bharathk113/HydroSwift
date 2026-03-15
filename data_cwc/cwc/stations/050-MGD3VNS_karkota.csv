@@ -1,0 +1,17 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 050-MGD3VNS
+# station_name: Karkota
+# latitude: 23.94611111111111
+# longitude: 82.67083333333333
+# river: Rihand
+# rl_zero: 265.0
+# warning_level: nan
+# danger_level: nan
+# hfl: 275.97
+# hfl_date: 2019-08-11
+station_code,time,wse,water_depth,unit,lat,lon
+050-MGD3VNS,2024-01-01 08:00:00,263.53,-1.4700000000000273,m,23.94611111111111,82.67083333333333
+050-MGD3VNS,2024-01-01 13:00:00,263.53,-1.4700000000000273,m,23.94611111111111,82.67083333333333
+050-MGD3VNS,2024-01-01 18:00:00,263.53,-1.4700000000000273,m,23.94611111111111,82.67083333333333

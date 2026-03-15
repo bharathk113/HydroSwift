@@ -1,0 +1,20 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 037-UGDHYD
+# station_name: Karanja Dam
+# latitude: 17.88
+# longitude: 77.31
+# river: Karanja
+# rl_zero: 0.0
+# warning_level: nan
+# danger_level: nan
+# hfl: nan
+# hfl_date: nan
+station_code,time,wse,water_depth,unit,lat,lon
+037-UGDHYD,2024-01-01 08:00:00,583.4,583.4,m,17.88,77.31
+037-UGDHYD,2024-01-02 08:00:00,583.4,583.4,m,17.88,77.31
+037-UGDHYD,2024-01-03 08:00:00,583.4,583.4,m,17.88,77.31
+037-UGDHYD,2024-01-04 08:00:00,583.4,583.4,m,17.88,77.31
+037-UGDHYD,2024-01-05 08:00:00,583.4,583.4,m,17.88,77.31
+037-UGDHYD,2024-01-06 08:00:00,583.4,583.4,m,17.88,77.31

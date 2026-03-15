@@ -1,0 +1,28 @@
+[2026-03-15 20:02:30] [INFO] Starting WRIS download for basin: Godavari
+[2026-03-15 20:02:58] [INFO] Processing dataset: solar_radiation
+[2026-03-15 20:02:59] [SUCCESS] Downloaded 7D8FED08 -> 7D8FED08_Kovvada kalva reservoir_SOLAR_RD.csv
+[2026-03-15 20:02:59] [SUCCESS] Downloaded 7D903A6C -> 7D903A6C_Dowlaiswaram_SOLAR_RD.csv
+[2026-03-15 20:02:59] [SUCCESS] Downloaded 7D901252 -> 7D901252_Vuyyuru_SOLAR_RD.csv
+[2026-03-15 20:02:59] [INFO] Merging 3 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 20:02:59] [INFO] Finished solar_radiation: Downloaded 3, Skipped 0 in 0.6s
+[2026-03-15 20:02:59] [INFO] Processing dataset: sediment
+[2026-03-15 20:03:06] [WARN] No data returned for station: 017-ugdhyd
+[2026-03-15 20:03:06] [WARN] No data returned for station: 020-ugdhyd
+[2026-03-15 20:03:06] [WARN] No data returned for station: 007-ugdhyd
+[2026-03-15 20:03:06] [WARN] No data returned for station: 031-ugdhyd
+[2026-03-15 20:03:06] [WARN] No data in requested time period; skipping merge
+[2026-03-15 20:03:06] [INFO] Finished sediment: Downloaded 0, Skipped 0 in 6.9s
+[2026-03-15 20:03:48] [INFO] Starting WRIS download for basin: Godavari
+[2026-03-15 20:03:57] [INFO] Processing dataset: solar_radiation
+[2026-03-15 20:03:58] [SUCCESS] Downloaded 7D8FED08 -> 7D8FED08_Kovvada kalva reservoir_SOLAR_RD.csv
+[2026-03-15 20:03:58] [SUCCESS] Downloaded 7D903A6C -> 7D903A6C_Dowlaiswaram_SOLAR_RD.csv
+[2026-03-15 20:03:58] [SUCCESS] Downloaded 7D901252 -> 7D901252_Vuyyuru_SOLAR_RD.csv
+[2026-03-15 20:03:58] [INFO] Merging 3 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-15 20:03:58] [INFO] Finished solar_radiation: Downloaded 3, Skipped 0 in 1.0s
+[2026-03-15 20:03:58] [INFO] Processing dataset: sediment
+[2026-03-15 20:04:05] [WARN] No data returned for station: 020-ugdhyd
+[2026-03-15 20:04:05] [WARN] No data returned for station: 007-ugdhyd
+[2026-03-15 20:04:05] [WARN] No data returned for station: 017-ugdhyd
+[2026-03-15 20:04:05] [WARN] No data returned for station: 031-ugdhyd
+[2026-03-15 20:04:05] [WARN] No data in requested time period; skipping merge
+[2026-03-15 20:04:05] [INFO] Finished sediment: Downloaded 0, Skipped 0 in 6.9s

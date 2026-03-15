@@ -1,0 +1,19 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 039-LKDHYD
+# station_name: Singatalur Barrage
+# latitude: 15.03
+# longitude: 75.83
+# river: Tungabhadra
+# rl_zero: 0.0
+# warning_level: nan
+# danger_level: nan
+# hfl: 509.5
+# hfl_date: nan
+station_code,time,wse,water_depth,unit,lat,lon
+039-LKDHYD,2024-01-01 08:00:00,506.4,506.4,m,15.03,75.83
+039-LKDHYD,2024-01-03 08:00:00,506.35,506.35,m,15.03,75.83
+039-LKDHYD,2024-01-04 08:00:00,506.3,506.3,m,15.03,75.83
+039-LKDHYD,2024-01-05 08:00:00,506.2,506.2,m,15.03,75.83
+039-LKDHYD,2024-01-06 08:00:00,506.1,506.1,m,15.03,75.83

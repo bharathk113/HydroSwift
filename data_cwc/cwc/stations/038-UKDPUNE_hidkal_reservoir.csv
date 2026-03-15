@@ -1,0 +1,19 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 038-UKDPUNE
+# station_name: Hidkal Reservoir
+# latitude: 16.14318611111111
+# longitude: 74.64265
+# river: Ghatprabha
+# rl_zero: 0.0
+# warning_level: nan
+# danger_level: nan
+# hfl: nan
+# hfl_date: nan
+station_code,time,wse,water_depth,unit,lat,lon
+038-UKDPUNE,2024-01-01 06:00:00,657.896,657.896,m,16.14318611111111,74.64265
+038-UKDPUNE,2024-01-02 06:00:00,657.789,657.789,m,16.14318611111111,74.64265
+038-UKDPUNE,2024-01-04 06:00:00,657.563,657.563,m,16.14318611111111,74.64265
+038-UKDPUNE,2024-01-05 06:00:00,657.448,657.448,m,16.14318611111111,74.64265
+038-UKDPUNE,2024-01-06 06:00:00,657.332,657.332,m,16.14318611111111,74.64265

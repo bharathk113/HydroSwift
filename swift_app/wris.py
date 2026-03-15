@@ -84,7 +84,14 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_
     df["lat"] = lat
     df["lon"] = lon
 
-    cols = ["station_code", "time", var_col, "unit", "lat", "lon"]
+    # Cache unit value (if present) for metadata/header; do not keep as a column.
+    unit_value = None
+    if "unit" in df.columns:
+        non_null_units = df["unit"].dropna().astype(str).unique()
+        if len(non_null_units) > 0:
+            unit_value = non_null_units[0]
+
+    cols = ["station_code", "time", var_col, "lat", "lon"]
     cols = [c for c in cols if c in df.columns]
     df = df[cols]
 
@@ -110,6 +117,10 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_
             if value is not None and value != "":
                 header_lines.append(f"# {key}: {value}")
 
+        # Add variable-specific unit metadata if available, e.g. # unit_solar: W/m2
+        if unit_value is not None and var_col:
+            header_lines.append(f"# unit_{var_col}: {unit_value}")
+
         with open(output_path, "w") as f:
             for line in header_lines:
                 f.write(line + "\n")
@@ -122,9 +133,12 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_
 
     else:
 
-        meta_df = pd.DataFrame(
-            [{"field": k, "value": v} for k, v in meta_dict.items() if v is not None]
-        )
+        # Include unit metadata in the Excel metadata sheet as well.
+        meta_items = [{"field": k, "value": v} for k, v in meta_dict.items() if v is not None]
+        if unit_value is not None and var_col:
+            meta_items.append({"field": f"unit_{var_col}", "value": unit_value})
+
+        meta_df = pd.DataFrame(meta_items)
 
         with pd.ExcelWriter(output_path) as writer:
             df.to_excel(writer, sheet_name="timeseries", index=False)
@@ -271,8 +285,16 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
 
     total_stations = 0
     station_filter = getattr(args, "stations", None)
+    # Normalise to set for O(1) lookup; use lowercased for case-insensitive match
+    # so DataFrame codes (e.g. "007-ugdhyd") match API/cache codes (e.g. "007-UGDHYD").
+    station_filter_norm = None
     if station_filter:
-        station_filter = {str(s) for s in station_filter}
+        station_filter_norm = {str(s).strip().lower() for s in station_filter}
+
+    def _station_in_filter(code):
+        if not station_filter_norm:
+            return True
+        return (str(code).strip().lower() if code else "") in station_filter_norm
 
     for dataset_code in selected.keys():
 
@@ -290,8 +312,8 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
             cache_updated = True
 
         stations_for_run = stations
-        if station_filter:
-            stations_for_run = [s for s in stations if s in station_filter]
+        if station_filter_norm:
+            stations_for_run = [s for s in stations if _station_in_filter(s)]
 
         total_stations += len(stations_for_run)
 
@@ -306,7 +328,7 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
     for dataset_code, folder in selected.items():
 
         from .cli import DATASET_COLUMNS
-        from .merge import merge_dataset_folder
+        from .merge import merge_dataset_folder, merge_dataset_files
 
         var_col = DATASET_COLUMNS.get(dataset_code, "value")
 
@@ -338,8 +360,8 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
             logger.log("INFO", f"Discovered {len(stations)} stations from WRIS API")
 
         stations_for_run = stations
-        if station_filter:
-            stations_for_run = [s for s in stations if s in station_filter]
+        if station_filter_norm:
+            stations_for_run = [s for s in stations if _station_in_filter(s)]
 
         dataset_dir = os.path.join(base_output, folder)
         os.makedirs(dataset_dir, exist_ok=True)
@@ -358,10 +380,11 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
         if skipped > 0:
             Console.warn(f"Stations skipped (already downloaded): {skipped}")
             if not Console.is_quiet:
-                print(f"{Console.ITALIC}Tip: use --overwrite to refresh data.{Console.RESET}")
+                print(f"{Console.ITALIC}Tip: call with overwrite=True to refresh data.{Console.RESET}")
             logger.log("INFO", f"Skipped {skipped} existing stations")
 
         counter = {"downloaded": 0}
+        downloaded_files = []
 
         # ---------------------------------------------------------
         # Worker
@@ -404,6 +427,7 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
                 with lock:
                     metadata_records[station_code] = meta
                     counter["downloaded"] += 1
+                    downloaded_files.append(outfile)
                 logger.log("SUCCESS", f"Downloaded {station_code} -> {os.path.basename(outfile)}")
 
         # ---------------------------------------------------------
@@ -433,18 +457,37 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
             Console.info("All stations already downloaded — skipping download step.")
 
         # ---------------------------------------------------------
-        # Merge
+        # Merge (only newly downloaded files; gpkg name includes time period)
         # ---------------------------------------------------------
 
         if args.merge:
 
-            gpkg_path = os.path.join(base_output, f"{args.basin}_{folder}.gpkg")
+            start_slug = (args.start_date or "1950-01-01")[:10]
+            end_slug = (args.end_date or "").strip()[:10] or time.strftime("%Y-%m-%d")
+            gpkg_path = os.path.join(
+                base_output,
+                f"{args.basin}_{folder}_{start_slug}_{end_slug}.gpkg",
+            )
 
-            if counter["downloaded"] == 0 and os.path.exists(gpkg_path):
-                Console.info(f"Using cached GeoPackage for {folder}")
-            else:
-                logger.log("INFO", f"Merging {folder} to GeoPackage")
-                merge_dataset_folder(dataset_dir, gpkg_path, folder)
+            if counter["downloaded"] == 0 and len(stations_for_run) > 0:
+                # Only warn when user provided a station list (e.g. from fetch(stations));
+                # direct wris.download() discovers stations itself, so no time-period warning.
+                if station_filter_norm and not Console.is_quiet:
+                    Console.warn(
+                        "No stations found with data in the requested time period; "
+                        "skipping merge for this dataset."
+                    )
+                logger.log("WARN", "No data in requested time period; skipping merge")
+            elif counter["downloaded"] == 0 and os.path.exists(gpkg_path):
+                Console.info(
+                    f"Using cached GeoPackage for {folder} ({start_slug} to {end_slug})"
+                )
+            elif counter["downloaded"] > 0:
+                logger.log(
+                    "INFO",
+                    f"Merging {len(downloaded_files)} file(s) to GeoPackage ({start_slug} to {end_slug})",
+                )
+                merge_dataset_files(downloaded_files, gpkg_path, folder)
 
         runtime = round(time.time() - dataset_start, 1)
 
@@ -499,3 +542,5 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
         print("-------------------------------------------------------------")
         print(f"Output directory: {base_output}")
         print("-------------------------------------------------------------")
+
+    return summary

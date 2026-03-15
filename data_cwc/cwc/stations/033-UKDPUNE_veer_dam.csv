@@ -1,0 +1,20 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 033-UKDPUNE
+# station_name: Veer Dam
+# latitude: 18.12
+# longitude: 74.08999999999999
+# river: Nira
+# rl_zero: 0.0
+# warning_level: nan
+# danger_level: nan
+# hfl: nan
+# hfl_date: nan
+station_code,time,wse,water_depth,unit,lat,lon
+033-UKDPUNE,2024-01-01 08:00:00,574.58,574.58,m,18.12,74.08999999999999
+033-UKDPUNE,2024-01-02 08:00:00,574.49,574.49,m,18.12,74.08999999999999
+033-UKDPUNE,2024-01-03 08:00:00,574.43,574.43,m,18.12,74.08999999999999
+033-UKDPUNE,2024-01-04 08:00:00,574.33,574.33,m,18.12,74.08999999999999
+033-UKDPUNE,2024-01-05 08:00:00,574.37,574.37,m,18.12,74.08999999999999
+033-UKDPUNE,2024-01-06 08:00:00,574.52,574.52,m,18.12,74.08999999999999

@@ -6,7 +6,55 @@ import pandas as pd
 import importlib
 
 
-def merge_dataset_folder(dataset_dir: str, gpkg_path: str, layer: str):
+def merge_dataset_files(file_paths: list[str], gpkg_path: str, layer: str) -> int:
+    """Merge a list of station CSV/XLSX files into a single GeoPackage.
+
+    Use this when only the files from the current run should be merged
+    (e.g. time-period-specific gpkg). File paths must point to existing files.
+    """
+    if not file_paths:
+        return 0
+
+    frames = []
+    for f in file_paths:
+        if not os.path.isfile(f):
+            continue
+        try:
+            if f.endswith(".csv"):
+                df = pd.read_csv(f, comment="#")
+            else:
+                df = pd.read_excel(f)
+
+            if {"lat", "lon"}.issubset(df.columns):
+                frames.append(df)
+
+        except Exception:
+            continue
+
+    if not frames:
+        return 0
+
+    merged = pd.concat(frames, ignore_index=True)
+    merged["lat"] = pd.to_numeric(merged["lat"], errors="coerce")
+    merged["lon"] = pd.to_numeric(merged["lon"], errors="coerce")
+    mask = merged["lat"].notna() & merged["lon"].notna()
+
+    gpd = importlib.import_module("geopandas")
+    gdf = gpd.GeoDataFrame(
+        merged[mask],
+        geometry=gpd.points_from_xy(
+            merged.loc[mask, "lon"],
+            merged.loc[mask, "lat"]
+        ),
+        crs="EPSG:4326"
+    )
+    rows = len(gdf)
+    gdf.to_file(gpkg_path, layer=layer, driver="GPKG")
+    print(f"Saved GeoPackage: {gpkg_path} ({rows} rows)")
+    return rows
+
+
+def merge_dataset_folder(dataset_dir: str, gpkg_path: str, layer: str) -> int:
 
     files = glob.glob(os.path.join(dataset_dir, "*.csv"))
     files += glob.glob(os.path.join(dataset_dir, "*.xlsx"))
@@ -107,14 +155,14 @@ def run_merge_only(args):
         station_dirs = []
         legacy_stations = cwc_root / "stations"
         if legacy_stations.exists() and legacy_stations.is_dir():
-            station_dirs.append((str(legacy_stations), "cwc_timeseries", "cwc_timeseries"))
+            station_dirs.append((str(legacy_stations), "cwc_waterlevel", "cwc_waterlevel"))
         for sub in cwc_root.iterdir():
             if sub.is_dir() and sub.name != "stations":
                 stations_sub = sub / "stations"
                 if stations_sub.exists() and stations_sub.is_dir():
                     basin_slug = sub.name
-                    layer = "cwc_timeseries"
-                    gpkg_name = f"cwc_timeseries_{basin_slug}.gpkg"
+                    layer = "cwc_waterlevel"
+                    gpkg_name = f"cwc_waterlevel_{basin_slug}.gpkg"
                     station_dirs.append((str(stations_sub), gpkg_name, layer))
 
         cwc_out = output_base / "cwc"
@@ -142,8 +190,11 @@ def run_merge_only(args):
     selected = selected_datasets(args)
 
     # ---------------------------------------------------------
-    # Merge WRIS datasets
+    # Merge WRIS datasets (save under output_base/wris/, like plot)
     # ---------------------------------------------------------
+
+    wris_out = output_base / "wris"
+    wris_out.mkdir(parents=True, exist_ok=True)
 
     for basin_dir in basin_dirs:
 
@@ -167,7 +218,7 @@ def run_merge_only(args):
                     print(f"Dataset '{d.name}' not found in basin: {basin}")
                 continue
 
-            gpkg_path = output_base / f"{basin}_{d.name}.gpkg"
+            gpkg_path = wris_out / f"{basin}_{d.name}.gpkg"
 
             merge_dataset_folder(str(d), str(gpkg_path), d.name)
 

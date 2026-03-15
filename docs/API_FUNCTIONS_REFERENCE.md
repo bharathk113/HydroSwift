@@ -11,12 +11,12 @@ Access via `import swift_app`. Only these are part of the stable public API.
 | Function / method | Description | Arguments |
 |-------------------|-------------|-----------|
 | **swift_app.wris.download** | Download WRIS time-series data to disk. | `basin` (str\|int), `variable` (str\|list), \*, `station=None`, `start_date="1950-01-01"`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `delay=0.25`, `quiet=False` |
-| **swift_app.wris.stations** | List WRIS stations in a basin (returns SwiftTable). | `basin` (str\|int), `variable` (required), `delay=0.25` |
+| **swift_app.wris.stations** | List WRIS stations for one or more basins/variables (returns SwiftTable with per-row `basin` and `variable` columns). | `basin` (str\|int\|list), `variable` (str\|list, required), `delay=0.25` |
 | **swift_app.cwc.download** | Download CWC water-level time-series to disk. | `station=None`, \*, `start_date=None`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `refresh=False` |
 | **swift_app.cwc.stations** | Return CWC station metadata (SwiftTable). | `station=None`, `basin=None`, `river=None`, `state=None`, `refresh=False` |
-| **swift_app.fetch** | Download using a WRIS/CWC stations table. | `stations` (DataFrame/SwiftTable from `wris.stations` or `cwc.stations`), \* `output_dir="output"`, `start_date="1950-01-01"`, `end_date=None`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `delay=0.25`, `refresh=False` |
-| **swift_app.merge** | Merge existing SWIFT station files into GeoPackages. | `input_dir=None`, `datasets=None`, `output_dir=None`, \*, `mode=None`, `basin=None`, `variable=None` |
-| **swift_app.plot** | Generate hydrograph plots from existing SWIFT output. | `input_dir=None`, `datasets=None`, `output_dir=None`, `cwc=False`, \*, `mode=None`, `basin=None`, `variable=None` |
+| **swift_app.fetch** | Download using a WRIS/CWC stations table. For multi-basin/variable WRIS tables, groups by `(basin, variable)` and dispatches each combination. | `stations` (DataFrame/SwiftTable from `wris.stations` or `cwc.stations`), \* `output_dir="output"`, `start_date="1950-01-01"`, `end_date=None`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `delay=0.25`, `refresh=False` |
+| **swift_app.merge** | Merge existing SWIFT station files into GeoPackages. Basins/agencies are auto-discovered from the directory layout. | `input_dir=None`, `output_dir=None`, \*, `mode=None`, `variable=None` |
+| **swift_app.plot** | Generate hydrograph plots from existing SWIFT output. Basins/agencies are auto-discovered from the directory layout. | `input_dir=None`, `output_dir=None`, `cwc=False`, \*, `mode=None`, `variable=None` |
 | **swift_app.cite** | Print banner and citation text. | (none) |
 | **swift_app.coffee** | Easter egg: print coffee-break message. | (none) |
 
@@ -32,7 +32,7 @@ Functions used by the public API; not guaranteed stable. Prefer the public API a
 |----------|-------------|-----------|
 | **get_wris_data** | Download WRIS time-series (used by `wris.download`). | `var`, `basin`, \*, `station=None`, `start_date`, `end_date`, `output_dir`, `format`, `overwrite`, `merge`, `plot`, `delay`, `quiet` |
 | **get_cwc_data** | Download CWC water-level data (used by `cwc.download`). | `station=None`, \*, `var=None`, `start_date`, `end_date`, `output_dir`, `format`, `overwrite`, `merge`, `plot`, `quiet`, `refresh` |
-| **wris_stations** | List WRIS stations in a basin (used by `wris.stations`). | `basin`, `var="discharge"`, `delay=0.25` |
+| **wris_stations** | List WRIS stations for one or more basins/variables (used by `wris.stations`). | `basin` (str\|int\|list), `var` (str\|list), `delay=0.25` |
 | **cwc_stations** | CWC station metadata (used by `cwc.stations`). | `station=None`, `basin=None`, `river=None`, `state=None`, `refresh=False` |
 | **_normalize_datasets_input** | Turn single str or list into list of dataset names. | `datasets` |
 | **_normalize_cwc_station_input** | Normalize CWC station to list or None. | `cwc_station` |
@@ -40,7 +40,9 @@ Functions used by the public API; not guaranteed stable. Prefer the public API a
 | **_normalize_dataset_flags** | Map human names to CLI flags; raise if unknown. | `datasets` |
 | **_build_args** | Build a SimpleNamespace of CLI-like args from kwargs. | `**kwargs` |
 | **_resolve_basin** | Map basin int/name to canonical basin name. | `basin` |
-| **_resolve_mode_input_dir** | Derive `input_dir` from `mode` and `basin`. | `mode`, `basin`, `output_dir` |
+| **_resolve_variable** | Normalise a variable string to its dataset flag. | `var` |
+| **_discover_basin_variable** | Discover WRIS stations for a single (basin, variable) pair. | `client`, `basin_name`, `dataset_code`, `dataset_flag` |
+| **_resolve_mode_input_dir** | Derive `input_dir` from `mode` (root containing ``wris/`` and ``cwc/``). | `mode`, `output_dir` |
 
 ---
 

@@ -1,0 +1,20 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 026-ugdhyd
+# station_name: Kaddam Dam
+# latitude: 19.1
+# longitude: 78.78999999999999
+# river: Kaddam vagu
+# rl_zero: 0.0
+# warning_level: nan
+# danger_level: nan
+# hfl: nan
+# hfl_date: nan
+station_code,time,wse,water_depth,unit,lat,lon
+026-ugdhyd,2024-01-01 06:00:00,208.3,208.3,m,19.1,78.78999999999999
+026-ugdhyd,2024-01-02 06:00:00,208.3,208.3,m,19.1,78.78999999999999
+026-ugdhyd,2024-01-03 06:00:00,208.293,208.293,m,19.1,78.78999999999999
+026-ugdhyd,2024-01-04 06:00:00,208.27,208.27,m,19.1,78.78999999999999
+026-ugdhyd,2024-01-05 06:00:00,208.247,208.247,m,19.1,78.78999999999999
+026-ugdhyd,2024-01-06 06:00:00,208.239,208.239,m,19.1,78.78999999999999

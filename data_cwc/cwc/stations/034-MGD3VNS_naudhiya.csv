@@ -1,0 +1,17 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 034-MGD3VNS
+# station_name: NAUDHIYA
+# latitude: 24.191388888888888
+# longitude: 81.47944444444444
+# river: Banas
+# rl_zero: 292.0
+# warning_level: nan
+# danger_level: nan
+# hfl: 304.02
+# hfl_date: 2024-08-04
+station_code,time,wse,water_depth,unit,lat,lon
+034-MGD3VNS,2024-01-01 08:00:00,296.21,4.2099999999999795,m,24.191388888888888,81.47944444444444
+034-MGD3VNS,2024-01-01 13:00:00,296.17,4.170000000000016,m,24.191388888888888,81.47944444444444
+034-MGD3VNS,2024-01-01 18:00:00,296.13,4.1299999999999955,m,24.191388888888888,81.47944444444444

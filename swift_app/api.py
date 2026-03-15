@@ -50,6 +50,26 @@ DATASET_ALIAS = {
     "groundwater_level": "gwl",
 }
 
+# Approximate WRIS variable → unit mapping for in-memory convenience.
+# This is used only to populate gdf.attrs["units"] on concatenated
+# GeoDataFrames returned by the high-level Python API; files on disk
+# still carry the authoritative metadata in their headers.
+WRIS_UNITS: dict[str, str] = {
+    "discharge": "m3/s",
+    "q": "m3/s",
+    "water_level": "m",
+    "wl": "m",
+    "rainfall": "mm",
+    "rf": "mm",
+    "temperature": "degC",
+    "temp": "degC",
+    "solar": "W/m2",
+    "solar_radiation": "W/m2",
+    "sediment": "mg/l",
+    "sed": "mg/l",
+    "gwl": "m",
+}
+
 
 # ---------------------------------------------------------
 # Internal helpers
@@ -130,7 +150,7 @@ def _resolve_basin(basin):
     if isinstance(basin, (list, tuple, set)):
         raise ValueError(
             "basin must be a single basin value here. "
-            "For multiple basins, pass a list to swift.wris.download()."
+            "For multiple basins, pass a list to swift.wris.stations() or swift.wris.download()."
         )
     if isinstance(basin, int):
         basin = str(basin)
@@ -198,8 +218,14 @@ def get_wris_data(
         basins = list(basin)
         if not basins:
             raise ValueError("basin must include at least one basin")
+        # Multi-basin: concatenate all returned GeoDataFrames (when merge=True).
+        try:
+            import pandas as _pd  # type: ignore[import]
+        except Exception:
+            _pd = None
+        frames = []
         for one_basin in basins:
-            get_wris_data(
+            res = get_wris_data(
                 var=var,
                 basin=one_basin,
                 station=station,
@@ -213,7 +239,19 @@ def get_wris_data(
                 delay=delay,
                 quiet=quiet,
             )
-        return None
+            if res is None or _pd is None:
+                continue
+            # Normalise res to DataFrame
+            if hasattr(res, "assign"):
+                frames.append(res.assign(basin=str(one_basin)))
+        if not frames or _pd is None:
+            return None
+        combined = _pd.concat(frames, ignore_index=True)
+        # Attach units mapping for downstream analysis (same units across basins).
+        vars_list = _normalize_datasets_input(var)
+        units_map = {str(v): WRIS_UNITS.get(str(v), "") for v in vars_list}
+        combined.attrs["units"] = units_map
+        return combined
 
     datasets = _normalize_datasets_input(var)
     if not datasets:
@@ -226,11 +264,14 @@ def get_wris_data(
     basin_name = _resolve_basin(basin)
     stations = _normalize_wris_station_input(station)
 
+    # Always enable on-disk GeoPackage merging; the *merge* flag controls
+    # only whether a concatenated GeoDataFrame is returned from this
+    # Python API, not whether files are merged on disk.
     args = _build_args(
         basin=basin_name,
         start_date=start_date,
         end_date=end_date,
-        merge=merge,
+        merge=True,
         overwrite=overwrite,
         output_dir=str(Path(output_dir)),
         delay=delay,
@@ -255,33 +296,90 @@ def get_wris_data(
     if not selected:
         raise ValueError("No datasets selected")
 
-    run_wris_download(args, selected, client, basin_code)
+    # Early user feedback so notebooks show that work has started.
+    try:
+        var_desc = ", ".join(datasets)
+        print(
+            f"Starting WRIS download for basin={basin_name!r}, "
+            f"Variables={var_desc} "
+            f"from {start_date or '1950-01-01'} to {end_date or 'latest'}..."
+        )
+    except Exception:
+        # Best-effort only; never fail because of a progress message.
+        pass
 
-    # Optionally generate plots from the freshly downloaded WRIS output.
-    # We call the top-level plot() helper directly, pointing it at the
-    # exact basin folder used by the WRIS engine.
-    #
-    # NOTE: the local parameter is also called ``plot``, so we must look
-    # up the module-level function from globals() instead of calling the
-    # boolean flag by accident.
-    if plot:
+    summary = run_wris_download(args, selected, client, basin_code)
+
+    # Optionally generate plots only for datasets that had data in the
+    # requested time period, so we do not plot stale files from earlier runs.
+    if plot and summary:
         _plot_func = globals().get("plot")
         if callable(_plot_func):
-            basin_dir = Path(output_dir) / "wris" / str(basin_name).lower()
-            _plot_func(
-                input_dir=str(basin_dir),
-                datasets=datasets,
-                output_dir=None,
-                cwc=False,
-            )
+            folders_with_downloads = {
+                item["dataset"] for item in summary
+                if item.get("downloaded", 0) > 0
+            }
+            datasets_with_data = [
+                d for d in datasets
+                if DATASETS.get(_resolve_variable(d), (None, None))[1] in folders_with_downloads
+            ]
+            if datasets_with_data:
+                basin_dir = Path(output_dir) / "wris" / str(basin_name).lower()
+                _plot_func(
+                    input_dir=str(basin_dir),
+                    variable=datasets_with_data,
+                    output_dir=None,
+                    cwc=False,
+                )
 
-    return None
+    # Optional in-memory result for WRIS when merge=True:
+    # load GeoPackages produced by this run and concatenate.
+    if not merge:
+        return None
+
+    try:
+        import geopandas as gpd  # type: ignore[import]
+    except Exception:
+        return None
+
+    vars_list = _normalize_datasets_input(var)
+    start_slug = (start_date or "1950-01-01")[:10]
+    end_slug = (end_date or time.strftime("%Y-%m-%d"))[:10]
+
+    frames = []
+    for v in vars_list:
+        try:
+            flag = _resolve_variable(v)
+            folder = DATASETS[flag][1]
+        except Exception:
+            continue
+        basin_dir = Path(output_dir) / "wris" / str(basin_name).lower()
+        gpkg_path = basin_dir / f"{basin_name}_{folder}_{start_slug}_{end_slug}.gpkg"
+        if not gpkg_path.exists():
+            continue
+        try:
+            gdf = gpd.read_file(gpkg_path)
+        except Exception:
+            continue
+        # Ensure basin / variable columns are present for downstream analysis.
+        gdf = gdf.assign(basin=str(basin_name), variable=str(v))
+        frames.append(gdf)
+
+    if not frames:
+        return None
+    import pandas as _pd  # type: ignore[import]
+    gdf_all = _pd.concat(frames, ignore_index=True)
+    # Attach units mapping for downstream analysis.
+    units_map = {str(v): WRIS_UNITS.get(str(v), "") for v in vars_list}
+    gdf_all.attrs["units"] = units_map
+    return gdf_all
 
 
 def get_cwc_data(
     station=None,
     *,
     var=None,
+    basin=None,
     start_date=None,
     end_date=None,
     output_dir="output",
@@ -303,6 +401,9 @@ def get_cwc_data(
     ----------
     station : str or list[str], optional
         CWC station code(s).  Downloads all stations when omitted.
+    basin : str, optional
+        When provided (e.g. from fetch with a basin-column table), files
+        are saved under ``output_dir/cwc/<basin>/stations/``.
     var : ignored
         Accepted for API symmetry with :func:`get_wris_data` but CWC
         only provides water level.  A warning is raised if a non-water-
@@ -329,6 +430,15 @@ def get_cwc_data(
     >>> swift.get_cwc_data()
     >>> swift.get_cwc_data(station='032-LGDHYD', start_date='2020-01-01')
     """
+    # Early user feedback so notebooks show that work has started.
+    try:
+        print(
+            f"Starting CWC download for station={station!r} "
+            f"from {start_date or '1950-01-01'} to {end_date or 'latest'}..."
+        )
+    except Exception:
+        pass
+
     if var is not None:
         allowed = {"water_level", "wl"}
         given = {var} if isinstance(var, str) else set(var)
@@ -345,14 +455,18 @@ def get_cwc_data(
 
     cwc_station = _normalize_cwc_station_input(station)
 
+    # Always enable on-disk GeoPackage merging; the *merge* flag controls
+    # only whether a concatenated GeoDataFrame is returned from this
+    # Python API, not whether files are merged on disk.
     args = _build_args(
         cwc=True,
         cwc_station=cwc_station,
         cwc_refresh=refresh,
+        basin=basin,
         start_date=start_date or "1950-01-01",
         end_date=end_date,
         overwrite=overwrite,
-        merge=merge,
+        merge=True,
         plot=plot,
         output_dir=str(Path(output_dir)),
         format=format,
@@ -360,45 +474,72 @@ def get_cwc_data(
     )
 
     run_cwc_download(args)
-    return None
+
+    # Optional in-memory result for CWC when merge=True:
+    # load GeoPackages produced by this run and concatenate.
+    if not merge:
+        return None
+
+    try:
+        import geopandas as gpd  # type: ignore[import]
+    except Exception:
+        return None
+
+    start_slug = (start_date or "1950-01-01")[:10]
+    end_slug = (end_date or time.strftime("%Y-%m-%d"))[:10]
+    cwc_root = Path(output_dir) / "cwc"
+    if not cwc_root.exists():
+        return None
+
+    frames = []
+    for gpkg_path in cwc_root.glob("cwc_waterlevel*.gpkg"):
+        stem = gpkg_path.stem
+        # Only include files matching the requested period.
+        if start_slug not in stem or end_slug not in stem:
+            continue
+        try:
+            gdf = gpd.read_file(gpkg_path)
+        except Exception:
+            continue
+        # Infer basin from filename: cwc_waterlevel_<basin>_<start>_<end>
+        parts = stem.split("_")
+        basin_label = None
+        if len(parts) > 3:
+            basin_label = "_".join(parts[2:-2])
+        gdf = gdf.assign(basin=basin_label)
+        frames.append(gdf)
+
+    if not frames:
+        return None
+    import pandas as _pd  # type: ignore[import]
+    gdf_all = _pd.concat(frames, ignore_index=True)
+    # Attach simple units metadata for CWC (water level).
+    gdf_all.attrs["units"] = {"water_level": "m"}
+    return gdf_all
 
 
 # ---------------------------------------------------------
 # Station discovery (internal; use swift.wris.stations / swift.cwc.stations)
 # ---------------------------------------------------------
 
-def wris_stations(basin, var, delay=0.25):
-    """
-    List available WRIS stations in a basin.
-
-    Parameters
-    ----------
-    basin : str or int
-        Basin name or number.
-    var : str
-        Dataset variable (required, e.g. ``'discharge'``, ``'solar'``).
-    delay : float
-        Seconds between API requests.
-
-    Returns
-    -------
-    SwiftTable
-    """
-    if var is None or str(var).strip() == "":
-        raise ValueError("var must be provided (for example: 'discharge' or 'solar').")
-
+def _resolve_variable(var):
+    """Normalise a single variable string to its dataset flag."""
     if var in DATASET_ALIAS:
-        dataset_flag = DATASET_ALIAS[var]
-    else:
-        dataset_flag = var
+        return DATASET_ALIAS[var]
+    if var in DATASETS:
+        return var
+    valid = sorted(set(list(DATASET_ALIAS.keys()) + list(DATASETS.keys())))
+    raise ValueError(
+        f"Unknown variable: {var!r}. Supported values: {', '.join(valid)}"
+    )
 
-    dataset_code, _ = DATASETS[dataset_flag]
-    basin_name = _resolve_basin(basin)
 
-    client = WrisClient(delay=delay)
-    basin_code = client.get_basin_code(basin_name)
-    basin_structure = build_basin_structure(client, basin_code)
+def _discover_station_codes(client, basin_code, basin_structure, dataset_code):
+    """Discover station codes and river-name fallbacks for one (basin, variable).
 
+    Returns ``(station_codes, river_fallback)`` where *station_codes* is a
+    sorted list and *river_fallback* maps station_code → river name.
+    """
     station_river_fallback: dict[str, str] = {}
     try:
         tributaries = client.get_tributaries(basin_code, dataset_code)
@@ -443,33 +584,142 @@ def wris_stations(basin, var, delay=0.25):
     agency_cache: dict = {}
     station_cache: dict = {}
 
-    stations = discover_stations(
+    station_codes = discover_stations(
         client, basin_structure, dataset_code, agency_cache, station_cache,
     )
+    return station_codes, station_river_fallback
 
-    records = []
-    for s in stations:
-        meta = client.get_metadata(s, dataset_code)
-        if not meta:
-            continue
-        records.append({
-            "station_code": s,
-            "station_name": meta.get("station_Name"),
-            "latitude": meta.get("latitude"),
-            "longitude": meta.get("longitude"),
-            "river": (
-                meta.get("riverName")
-                or meta.get("river")
-                or station_river_fallback.get(s)
-            ),
-        })
 
-    df = pd.DataFrame(records)
-    df = df.sort_values("station_code").reset_index(drop=True)
+def wris_stations(basin, var, delay=0.25):
+    """
+    List available WRIS stations for one or more basins and variables.
+
+    Parameters
+    ----------
+    basin : str, int, or list
+        Basin name(s) or number(s).  Pass a list for multiple basins.
+    var : str or list[str]
+        Dataset variable(s) (e.g. ``'discharge'``, ``'solar'``).
+        Pass a list for multiple variables.
+    delay : float
+        Seconds between API requests.
+
+    Returns
+    -------
+    SwiftTable
+        DataFrame with columns ``station_code``, ``station_name``,
+        ``latitude``, ``longitude``, ``river``, ``basin``, ``variable``.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    print("Searching the WRIS database... This might take some time.")
+
+    # -- normalise inputs to lists --------------------------------
+    if var is None:
+        raise ValueError("var must be provided (for example: 'discharge' or 'solar').")
+    if isinstance(var, str):
+        var_list = [v.strip() for v in [var] if v.strip()]
+    elif isinstance(var, (list, tuple, set)):
+        var_list = [str(v).strip() for v in var if str(v).strip()]
+    else:
+        var_list = [str(var).strip()]
+    if not var_list:
+        raise ValueError("var must be provided (for example: 'discharge' or 'solar').")
+
+    if isinstance(basin, (list, tuple, set)):
+        basin_list = list(basin)
+    else:
+        basin_list = [basin]
+    if not basin_list:
+        raise ValueError("basin must include at least one basin.")
+
+    # -- resolve each variable to its dataset flag and code -------
+    var_specs = []
+    for v in var_list:
+        flag = _resolve_variable(v)
+        dataset_code, _ = DATASETS[flag]
+        var_specs.append((v, flag, dataset_code))
+
+    # -- resolve each basin name ----------------------------------
+    basin_names = [_resolve_basin(b) for b in basin_list]
+
+    client = WrisClient(delay=delay)
+
+    # ── Phase 1: pre-compute per-basin data (shared across variables) ──
+    basin_cache: dict[str, tuple] = {}
+    for bname in basin_names:
+        if bname not in basin_cache:
+            basin_code = client.get_basin_code(bname)
+            basin_structure = build_basin_structure(client, basin_code)
+            basin_cache[bname] = (basin_code, basin_structure)
+
+    # ── Phase 2: discover station codes for each (basin, variable) ──
+    combo_data: dict[tuple, tuple] = {}
+    all_meta_keys: set[tuple[str, str]] = set()
+
+    for bname in basin_names:
+        basin_code, basin_structure = basin_cache[bname]
+        for user_var, flag, dataset_code in var_specs:
+            station_codes, river_fb = _discover_station_codes(
+                client, basin_code, basin_structure, dataset_code,
+            )
+            combo_data[(bname, user_var)] = (station_codes, river_fb, dataset_code)
+            for s in station_codes:
+                all_meta_keys.add((s, dataset_code))
+
+    # ── Phase 3: parallel metadata fetch ──
+    meta_cache: dict[tuple[str, str], dict | None] = {}
+
+    def _fetch_meta(key):
+        s, dc = key
+        return key, client.get_metadata(s, dc)
+
+    n_workers = min(8, max(1, len(all_meta_keys)))
+    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+        futures = {pool.submit(_fetch_meta, k): k for k in all_meta_keys}
+        for fut in as_completed(futures):
+            key, meta = fut.result()
+            meta_cache[key] = meta
+
+    # ── Phase 4: assemble records ──
+    all_records = []
+    for bname in basin_names:
+        for user_var, flag, dataset_code in var_specs:
+            station_codes, river_fb, dc = combo_data[(bname, user_var)]
+            for s in station_codes:
+                meta = meta_cache.get((s, dc))
+                if not meta:
+                    continue
+                all_records.append({
+                    "station_code": s,
+                    "station_name": meta.get("station_Name"),
+                    "latitude": meta.get("latitude"),
+                    "longitude": meta.get("longitude"),
+                    "river": (
+                        meta.get("riverName")
+                        or meta.get("river")
+                        or river_fb.get(s)
+                    ),
+                    "basin": bname,
+                    "variable": user_var,
+                })
+
+    df = pd.DataFrame(all_records)
+    if df.empty:
+        df = pd.DataFrame(
+            columns=["station_code", "station_name", "latitude",
+                      "longitude", "river", "basin", "variable"]
+        )
+    df = df.sort_values(["basin", "variable", "station_code"]).reset_index(drop=True)
     out = SwiftTable(df.copy())
     out.attrs["source"] = "wris"
-    out.attrs["basin"] = basin_name
-    out.attrs["variable"] = var
+    out.attrs["basin"] = basin_names
+    out.attrs["variable"] = var_list
+
+    print(
+        "The station list returned does not guarantee time series data "
+        "availability for all time periods."
+    )
     return out
 
 
@@ -485,12 +735,12 @@ def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False
     ----------
     station : str, optional
         Station code or partial name.
-    basin : str, optional
-        Basin name filter (substring, case-insensitive).
+    basin : str or list[str], optional
+        Basin name filter (substring, case-insensitive). Pass a list for multiple basins.
     river : str, optional
         River name filter (substring, case-insensitive).
-    state : str, optional
-        State name filter (substring, case-insensitive).
+    state : str or list[str], optional
+        State name filter (substring, case-insensitive). Pass a list for multiple states.
     refresh : bool, default False
         If True, fetch fresh metadata from the CWC API (~2 min).
         Metadata is mostly static and only changes when a new HFL is
@@ -499,13 +749,16 @@ def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False
     Returns
     -------
     SwiftTable
+        Has ``code``, ``name``, ``basin``, ``state``, ``river``, etc.
+        Use with ``swift.fetch(table, ...)``; when the table has a ``basin``
+        column, data is saved under ``output_dir/cwc/<basin>/stations/``.
 
     Examples
     --------
-    >>> swift.cwc_stations()
-    >>> swift.cwc_stations(station="032-LGDHYD")
-    >>> swift.cwc_stations(basin="godavari")
-    >>> swift.cwc_stations(refresh=True)
+    >>> swift.cwc.stations()
+    >>> swift.cwc.stations(station="032-LGDHYD")
+    >>> swift.cwc.stations(basin="godavari")
+    >>> swift.cwc.stations(basin=["Godavari", "Krishna"], state=["Telangana", "Andhra Pradesh"])
     """
     df = get_cwc_station_metadata(
         station=station,
@@ -517,9 +770,9 @@ def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False
     out = SwiftTable(df.copy())
     out.attrs["source"] = "cwc"
     if basin is not None:
-        out.attrs["basin"] = basin
+        out.attrs["basin"] = [basin] if isinstance(basin, str) else list(basin)
     if state is not None:
-        out.attrs["state"] = state
+        out.attrs["state"] = [state] if isinstance(state, str) else list(state)
     if river is not None:
         out.attrs["river"] = river
     return out
@@ -584,18 +837,39 @@ class _WrisNamespace:
 
     @staticmethod
     def stations(basin, variable, delay=0.25, state=None):
-        """List available WRIS stations in a basin.
+        """List available WRIS stations for one or more basins/variables.
+
+        Parameters
+        ----------
+        basin : str, int, or list
+            Basin name(s) or number(s).
+        variable : str or list[str]
+            Dataset variable(s) (e.g. ``'discharge'``, ``'solar'``).
+        delay : float
+            Seconds between API requests.
 
         Returns
         -------
         SwiftTable
+            Columns: ``station_code``, ``station_name``, ``latitude``,
+            ``longitude``, ``river``, ``basin``, ``variable``.
         """
         if state is not None and str(state).strip() != "":
             raise ValueError(
                 "state filtering is currently only supported for swift.cwc.stations(). "
                 "WRIS station discovery supports basin-level filtering only."
             )
-        if variable is None or str(variable).strip() == "":
+        if variable is None:
+            raise ValueError(
+                "variable is required for swift.wris.stations() "
+                "(for example: 'discharge' or 'solar')."
+            )
+        if isinstance(variable, str) and not variable.strip():
+            raise ValueError(
+                "variable is required for swift.wris.stations() "
+                "(for example: 'discharge' or 'solar')."
+            )
+        if isinstance(variable, (list, tuple, set)) and not variable:
             raise ValueError(
                 "variable is required for swift.wris.stations() "
                 "(for example: 'discharge' or 'solar')."
@@ -610,6 +884,7 @@ class _CwcNamespace:
     def download(
         station=None,
         *,
+        basin=None,
         start_date=None,
         end_date=None,
         output_dir="output",
@@ -626,6 +901,8 @@ class _CwcNamespace:
         ----------
         station : str or list[str], optional
             CWC station code(s).  Downloads all when omitted.
+        basin : str, optional
+            When set, files are saved under ``output_dir/cwc/<basin>/stations/``.
         start_date, end_date : str, optional
             ISO date strings.
         output_dir : str
@@ -637,6 +914,7 @@ class _CwcNamespace:
         """
         return get_cwc_data(
             station=station,
+            basin=basin,
             start_date=start_date,
             end_date=end_date,
             output_dir=output_dir,
@@ -692,9 +970,11 @@ def fetch(
     Parameters
     ----------
     stations : pandas.DataFrame
-        Station table. For WRIS it should include ``station_code`` and
-        attrs: ``source='wris'``, ``basin``, ``variable``. For CWC it
-        should include ``code`` and attrs ``source='cwc'``.
+        Station table.  For WRIS tables produced by
+        ``swift.wris.stations()`` the DataFrame contains per-row
+        ``basin`` and ``variable`` columns; ``fetch`` groups by these
+        and dispatches each (basin, variable) combination separately.
+        For CWC it should include ``code`` and attrs ``source='cwc'``.
     output_dir : str
         Root output directory.
     start_date, end_date : str
@@ -706,6 +986,16 @@ def fetch(
     refresh : bool
         CWC metadata refresh flag before download.
     """
+    # Early user feedback so notebooks show that work has started.
+    try:
+        n = getattr(stations, "shape", (len(stations),))[0] if hasattr(stations, "__len__") else "unknown"
+        print(
+            f"Starting fetch for stations table (rows={n}) "
+            f"from {start_date or '1950-01-01'} to {end_date or 'latest'}..."
+        )
+    except Exception:
+        pass
+
     if not isinstance(stations, pd.DataFrame):
         raise TypeError(
             "fetch() expects a pandas DataFrame/SwiftTable from "
@@ -728,11 +1018,54 @@ def fetch(
     if source == "wris":
         if "station_code" not in stations.columns:
             raise ValueError("WRIS stations table must include 'station_code' column.")
+
+        has_group_cols = (
+            "basin" in stations.columns and "variable" in stations.columns
+        )
+
+        if has_group_cols:
+            groups = stations.groupby(["basin", "variable"], sort=True)
+            try:
+                import pandas as _pd  # type: ignore[import]
+            except Exception:
+                _pd = None
+            frames = []
+            for (grp_basin, grp_variable), grp_df in groups:
+                codes = sorted(
+                    {
+                        str(c).strip()
+                        for c in grp_df["station_code"].dropna().tolist()
+                        if str(c).strip()
+                    }
+                )
+                if not codes:
+                    continue
+                res = wris.download(
+                    basin=grp_basin,
+                    variable=grp_variable,
+                    station=codes,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    format=format,
+                    overwrite=overwrite,
+                    merge=merge,
+                    plot=plot,
+                    delay=delay,
+                    quiet=quiet,
+                )
+                if res is not None and _pd is not None:
+                    if hasattr(res, "assign"):
+                        frames.append(res.assign(basin=str(grp_basin), variable=str(grp_variable)))
+            if not frames or _pd is None:
+                return None
+            return _pd.concat(frames, ignore_index=True)
+
         basin = stations.attrs.get("basin")
         variable = stations.attrs.get("variable")
         if basin is None or variable is None:
             raise ValueError(
-                "WRIS station table is missing attrs 'basin' and/or 'variable'. "
+                "WRIS station table is missing 'basin'/'variable' columns or attrs. "
                 "Build it using swift.wris.stations(basin=..., variable=...)."
             )
         station_codes = sorted(
@@ -762,6 +1095,55 @@ def fetch(
     if source == "cwc":
         if "code" not in stations.columns:
             raise ValueError("CWC stations table must include 'code' column.")
+
+        has_basin_col = "basin" in stations.columns
+
+        if has_basin_col:
+            # Group by basin so each group is saved under output_dir/cwc/<basin>/stations/
+            # Use "unknown" for missing basin so those stations still get a folder.
+            def _basin_slug(val):
+                if pd.isna(val) or val is None or str(val).strip() == "":
+                    return "unknown"
+                return str(val).strip()
+
+            groups = stations.groupby(
+                stations["basin"].map(_basin_slug),
+                sort=True,
+            )
+            try:
+                import pandas as _pd  # type: ignore[import]
+            except Exception:
+                _pd = None
+            frames = []
+            for grp_basin, grp_df in groups:
+                codes = sorted(
+                    {
+                        str(c).strip()
+                        for c in grp_df["code"].dropna().tolist()
+                        if str(c).strip()
+                    }
+                )
+                if not codes:
+                    continue
+                res = cwc_ns.download(
+                    station=codes,
+                    basin=grp_basin if grp_basin != "unknown" else None,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    format=format,
+                    overwrite=overwrite,
+                    merge=merge,
+                    plot=plot,
+                    quiet=quiet,
+                    refresh=refresh,
+                )
+                if res is not None and _pd is not None and hasattr(res, "assign"):
+                    frames.append(res.assign(basin=str(grp_basin)))
+            if not frames or _pd is None:
+                return None
+            return _pd.concat(frames, ignore_index=True)
+
         station_codes = sorted(
             {
                 str(code).strip()
@@ -791,234 +1173,276 @@ def fetch(
 # Merge / Plot
 # ---------------------------------------------------------
 
-def _resolve_mode_input_dir(mode, basin, output_dir):
-    """Derive ``input_dir`` from *mode* and *basin* using SWIFT conventions."""
+def _resolve_mode_input_dir(mode, output_dir):
+    """Derive ``input_dir`` from *mode* using SWIFT conventions (root containing wris/ and cwc/)."""
     base = Path(output_dir or "output")
-    if mode == "wris":
-        wris_root = base / "wris"
-        if basin is None:
-            return str(wris_root)
-        return str(wris_root / str(_resolve_basin(basin)).lower())
-    elif mode == "cwc":
+    if mode in ("wris", "cwc"):
         return str(base)
     raise ValueError(f"Unknown mode: {mode!r}. Use 'wris' or 'cwc'.")
 
 
 def merge(
     input_dir=None,
-    datasets=None,
     output_dir=None,
     *,
     mode=None,
-    basin=None,
     variable=None,
 ):
     """
     Merge existing SWIFT station files into GeoPackages.
 
-    Can be called with an explicit ``input_dir`` (legacy) or with
-    ``mode`` / ``basin`` / ``variable`` for a higher-level interface.
+    Basins and (for CWC) agencies are auto-discovered from the directory
+    layout under *input_dir*; no basin argument is needed.
 
     Parameters
     ----------
     input_dir : str or Path, optional
-        Root directory containing SWIFT output.  Inferred from *mode*
-        and *basin* when not given.
-    datasets : str or list[str], optional
-        Subset of variables to merge.
+        Root directory containing ``wris/`` and/or ``cwc/`` subfolders.
+        When *mode* is set and this is omitted, defaults to *output_dir*.
     output_dir : str or Path, optional
         Destination for merged GeoPackages (defaults to *input_dir*).
+        WRIS outputs go to ``output_dir/wris/``, CWC to ``output_dir/cwc/``.
     mode : ``'wris'`` | ``'cwc'``, optional
-        Data source mode.  When provided, ``input_dir`` is derived
-        automatically from the SWIFT output directory layout.
-    basin : str or int, optional
-        Basin (used with ``mode='wris'``).
+        Data source mode.  When provided and *input_dir* is omitted,
+        *input_dir* is taken from *output_dir*.
     variable : str or list[str], optional
-        Alias for *datasets* (preferred name for new code).
+        Subset of variables to merge (WRIS only; e.g. ``["solar", "discharge"]``).
     """
-    if variable is not None and datasets is None:
-        datasets = variable if isinstance(variable, list) else [variable]
-
-    # In CWC mode, merge operates on the entire CWC tree under the
-    # input/output root. Basin- or dataset-level selection is a WRIS
-    # concept; warn and ignore these hints rather than erroring.
-    if mode == "cwc" and (basin is not None or datasets is not None):
+    _var_list = (
+        [] if variable is None
+        else [variable] if isinstance(variable, str)
+        else list(variable)
+    )
+    if mode == "cwc" and _var_list:
         warnings.warn(
-            "swift.merge(mode='cwc', ...) ignores basin/datasets filters. "
-            "Merging all available CWC station files under the input/output root.",
+            "swift.merge(mode='cwc', ...) ignores variable; CWC data only has water levels.",
             UserWarning,
             stacklevel=2,
         )
-    if isinstance(basin, (list, tuple, set)):
-        basins = list(basin)
-        if not basins:
-            raise ValueError("basin must include at least one basin")
-        for one_basin in basins:
-            try:
-                merge(
-                    input_dir=input_dir,
-                    datasets=datasets,
-                    output_dir=output_dir,
-                    mode=mode,
-                    basin=one_basin,
-                    variable=variable,
-                )
-            except ValueError as exc:
-                if "Basin directory not found" in str(exc):
-                    warnings.warn(
-                        f"Basin '{one_basin}' not found in input_dir='{input_dir}'. Skipping.",
-                        UserWarning,
-                        stacklevel=2,
-                    )
-                    continue
-                raise
-        return None
+        _var_list = []
+    dataset_flags = _normalize_dataset_flags(_var_list)
+
     if mode is not None and input_dir is None:
-        input_dir = _resolve_mode_input_dir(mode, basin, output_dir)
-    elif basin is not None and input_dir is not None and mode is None:
-        # Standalone WRIS merge with explicit basin selection:
-        # constrain merge to that basin under the provided input root.
-        input_root = Path(input_dir)
-        basin_name = str(_resolve_basin(basin)).lower()
-        wris_root = input_root / "wris"
-        if wris_root.exists() and wris_root.is_dir():
-            basin_dir = wris_root / basin_name
-        else:
-            basin_dir = input_root / basin_name
-        if not basin_dir.exists():
-            raise ValueError(
-                f"Basin directory not found for basin={basin!r} in input_dir={input_dir!r}"
-            )
-        input_dir = str(basin_dir)
+        input_dir = _resolve_mode_input_dir(mode, output_dir)
+
     if input_dir is None:
         raise ValueError(
-            "input_dir must be specified (or provide mode= to derive it)"
+            "input_dir must be specified (or provide mode= and output_dir= to derive it)"
         )
     p = Path(input_dir)
     if not p.exists():
         raise ValueError("input_dir does not exist")
-    dataset_flags = _normalize_dataset_flags(datasets)
-    args = _build_args(
-        input_dir=str(p),
-        output_dir=str(output_dir) if output_dir else None,
-        merge_only=True,
-        dataset_flags=dataset_flags,
-        cwc=(mode == "cwc") if mode else False,
-    )
+
+    # When output_dir is provided, preserve existing behavior: merge to disk
+    # and also return a concatenated GeoDataFrame for convenience.
+    if output_dir is not None:
+        args = _build_args(
+            input_dir=str(p),
+            output_dir=str(output_dir),
+            merge_only=True,
+            dataset_flags=dataset_flags,
+            cwc=(mode == "cwc") if mode else False,
+        )
+        try:
+            run_merge_only(args)
+        except PermissionError as exc:
+            raise ValueError(
+                f"output_dir is not writable: {output_dir!r}. "
+                "Choose a writable directory (for example, a path inside your workspace)."
+            ) from exc
+        except OSError as exc:
+            raise ValueError(
+                f"Unable to use output_dir={output_dir!r}: {exc}"
+            ) from exc
+        # After on-disk merge, load the resulting GeoPackages and concatenate.
+        try:
+            import geopandas as gpd  # type: ignore[import]
+        except Exception:
+            return None
+
+        frames = []
+        root = Path(output_dir)
+        if mode == "cwc":
+            cwc_root = root / "cwc"
+            for gpkg_path in cwc_root.glob("cwc_waterlevel*.gpkg"):
+                try:
+                    gdf = gpd.read_file(gpkg_path)
+                except Exception:
+                    continue
+                stem = gpkg_path.stem
+                parts = stem.split("_")
+                basin_label = None
+                if len(parts) > 3:
+                    basin_label = "_".join(parts[2:])
+                gdf = gdf.assign(basin=basin_label)
+                frames.append(gdf)
+        else:
+            wris_root = root / "wris"
+            if wris_root.exists() and wris_root.is_dir():
+                for gpkg_path in wris_root.glob("*.gpkg"):
+                    try:
+                        gdf = gpd.read_file(gpkg_path)
+                    except Exception:
+                        continue
+                    # Infer basin / variable from filename: <basin>_<dataset>.gpkg
+                    stem = gpkg_path.stem
+                    parts = stem.split("_", 1)
+                    basin_label = parts[0] if parts else None
+                    var_label = parts[1] if len(parts) > 1 else None
+                    gdf = gdf.assign(basin=basin_label, variable=var_label)
+                    frames.append(gdf)
+
+        if not frames:
+            return None
+        import pandas as _pd  # type: ignore[import]
+        return _pd.concat(frames, ignore_index=True)
+
+    # When output_dir is omitted, operate in-memory only: read station files
+    # under input_dir and return a concatenated GeoDataFrame without writing
+    # any GeoPackages.
     try:
-        run_merge_only(args)
-    except PermissionError as exc:
-        raise ValueError(
-            f"output_dir is not writable: {output_dir!r}. "
-            "Choose a writable directory (for example, a path inside your workspace)."
-        ) from exc
-    except OSError as exc:
-        raise ValueError(
-            f"Unable to use output_dir={output_dir!r}: {exc}"
-        ) from exc
-    return None
+        import pandas as _pd  # type: ignore[import]
+    except Exception:
+        return None
+    from .merge import merge_dataset_folder
+
+    # Reuse merge_dataset_folder's CSV/XLSX reading logic by writing to a
+    # temporary GeoPackage and reading it back, then deleting it.
+    import tempfile
+    import os as _os
+
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        if mode == "cwc":
+            # CWC station dirs under input_dir/cwc/...
+            from pathlib import Path as _P
+            root_cwc = _P(input_dir) / "cwc"
+            station_dirs = []
+            legacy = root_cwc / "stations"
+            if legacy.exists() and legacy.is_dir():
+                station_dirs.append(str(legacy))
+            for sub in root_cwc.iterdir() if root_cwc.exists() else []:
+                if sub.is_dir() and sub.name != "stations":
+                    sdir = sub / "stations"
+                    if sdir.exists() and sdir.is_dir():
+                        station_dirs.append(str(sdir))
+            frames = []
+            for d in station_dirs:
+                tmp_gpkg = _os.path.join(tmp_dir, "tmp_cwc.gpkg")
+                merge_dataset_folder(d, tmp_gpkg, "cwc_waterlevel")
+                try:
+                    import geopandas as gpd  # type: ignore[import]
+                    gdf = gpd.read_file(tmp_gpkg)
+                    frames.append(gdf)
+                except Exception:
+                    continue
+            if not frames:
+                return None
+            return _pd.concat(frames, ignore_index=True)
+        else:
+            # WRIS: detect basin directories and dataset dirs as in run_merge_only
+            from pathlib import Path as _P
+            from .cli import DATASETS, selected_datasets
+            root = _P(input_dir)
+            dataset_names = {folder for _, folder in DATASETS.values()}
+            wris_root = root / "wris"
+            wris_input_root = wris_root if wris_root.exists() and wris_root.is_dir() else root
+            if any((wris_input_root / d).is_dir() and d in dataset_names for d in _os.listdir(wris_input_root)):
+                basin_dirs = [wris_input_root]
+            else:
+                basin_dirs = [d for d in wris_input_root.iterdir() if d.is_dir()]
+            # Build args-like object for selected_datasets
+            class _Args:
+                pass
+            a = _Args()
+            for key in ["q", "wl", "atm", "rf", "temp", "rh", "solar", "sed", "gwl"]:
+                setattr(a, key, False)
+            for flag in dataset_flags:
+                setattr(a, flag, True)
+            selected = selected_datasets(a)
+            frames = []
+            import geopandas as gpd  # type: ignore[import]
+            for basin_dir in basin_dirs:
+                basin = basin_dir.name
+                if not selected:
+                    dataset_dirs = [d for d in basin_dir.iterdir() if d.is_dir()]
+                else:
+                    dataset_dirs = [basin_dir / folder for _, folder in selected.items()]
+                for d in dataset_dirs:
+                    if not d.exists():
+                        continue
+                    tmp_gpkg = _os.path.join(tmp_dir, "tmp_wris.gpkg")
+                    merge_dataset_folder(str(d), tmp_gpkg, d.name)
+                    try:
+                        gdf = gpd.read_file(tmp_gpkg)
+                    except Exception:
+                        continue
+                    gdf = gdf.assign(basin=str(basin), variable=str(d.name))
+                    frames.append(gdf)
+            if not frames:
+                return None
+            return _pd.concat(frames, ignore_index=True)
+    finally:
+        import shutil as _shutil
+        _shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def plot(
     input_dir=None,
-    datasets=None,
     output_dir=None,
     cwc=False,
     *,
     mode=None,
-    basin=None,
     variable=None,
 ):
     """
     Generate hydrograph plots from existing SWIFT output.
 
-    Can be called with an explicit ``input_dir`` (legacy) or with
-    ``mode`` / ``basin`` / ``variable`` for a higher-level interface.
+    Basins and (for CWC) agencies are auto-discovered from the directory
+    layout under *input_dir*; no basin argument is needed.
 
     Parameters
     ----------
     input_dir : str or Path, optional
-        Root directory containing SWIFT output.  Inferred from *mode*
-        and *basin* when not given.
-    datasets : str or list[str], optional
-        Subset of variables to plot.
+        Root directory containing ``wris/`` and/or ``cwc/`` subfolders.
+        When *mode* is set and this is omitted, defaults to *output_dir*.
     output_dir : str or Path, optional
         Destination for plot images (defaults to *input_dir*).
+        WRIS images go to ``output_dir/wris/<basin>/images/<variable>/``, CWC to ``output_dir/cwc/...``.
     cwc : bool, default False
         Legacy flag -- prefer ``mode='cwc'``.
     mode : ``'wris'`` | ``'cwc'``, optional
         Data source mode.
-    basin : str or int, optional
-        Basin (used with ``mode='wris'``).
     variable : str or list[str], optional
-        Alias for *datasets*.
+        Subset of variables to plot (WRIS only; e.g. ``["solar", "discharge"]``).
     """
-    if variable is not None and datasets is None:
-        datasets = variable if isinstance(variable, list) else [variable]
-
-    # In CWC mode, plotting scans all CWC station files under the root.
-    # Basin/dataset filters are WRIS concepts; warn and ignore when
-    # users pass them with mode='cwc'.
-    if mode == "cwc" and (basin is not None or datasets is not None):
+    _var_list = (
+        [] if variable is None
+        else [variable] if isinstance(variable, str)
+        else list(variable)
+    )
+    if (mode == "cwc" or cwc) and _var_list:
         warnings.warn(
-            "swift.plot(mode='cwc', ...) ignores basin/datasets filters. "
-            "Plotting all available CWC station files under the input/output root.",
+            "swift.plot(mode='cwc', ...) ignores variable; CWC data only has water levels.",
             UserWarning,
             stacklevel=2,
         )
-    if isinstance(basin, (list, tuple, set)):
-        basins = list(basin)
-        if not basins:
-            raise ValueError("basin must include at least one basin")
-        for one_basin in basins:
-            try:
-                plot(
-                    input_dir=input_dir,
-                    datasets=datasets,
-                    output_dir=output_dir,
-                    cwc=cwc,
-                    mode=mode,
-                    basin=one_basin,
-                    variable=variable,
-                )
-            except ValueError as exc:
-                if "Basin directory not found" in str(exc):
-                    warnings.warn(
-                        f"Basin '{one_basin}' not found in input_dir='{input_dir}'. Skipping.",
-                        UserWarning,
-                        stacklevel=2,
-                    )
-                    continue
-                raise
-        return None
+        _var_list = []
+    dataset_flags = _normalize_dataset_flags(_var_list)
+
     if mode is not None:
         if mode == "cwc":
             cwc = True
         if input_dir is None:
-            input_dir = _resolve_mode_input_dir(mode, basin, output_dir)
-    elif basin is not None and not cwc and input_dir is not None:
-        # Standalone WRIS plot with explicit basin selection:
-        # constrain plotting to that basin under the provided input root.
-        input_root = Path(input_dir)
-        basin_name = str(_resolve_basin(basin)).lower()
-        wris_root = input_root / "wris"
-        if wris_root.exists() and wris_root.is_dir():
-            basin_dir = wris_root / basin_name
-        else:
-            basin_dir = input_root / basin_name
-        if not basin_dir.exists():
-            raise ValueError(
-                f"Basin directory not found for basin={basin!r} in input_dir={input_dir!r}"
-            )
-        input_dir = str(basin_dir)
+            input_dir = _resolve_mode_input_dir(mode, output_dir)
+
     if input_dir is None:
         raise ValueError(
-            "input_dir must be specified (or provide mode= to derive it)"
+            "input_dir must be specified (or provide mode= and output_dir= to derive it)"
         )
     p = Path(input_dir)
     if not p.exists():
         raise ValueError("input_dir does not exist")
-    dataset_flags = _normalize_dataset_flags(datasets)
     args = _build_args(
         input_dir=str(p),
         output_dir=str(output_dir) if output_dir else None,

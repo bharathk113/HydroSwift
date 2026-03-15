@@ -1,0 +1,15 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 037-LKDHYD
+# station_name: Kurnool Town
+# latitude: 15.845
+# longitude: 78.0375
+# river: Tungabhadra
+# rl_zero: 266.0
+# warning_level: 273.0
+# danger_level: 274.0
+# hfl: 281.23
+# hfl_date: 2009-10-02
+station_code,time,wse,water_depth,unit,lat,lon
+037-LKDHYD,2024-01-01 08:00:00,267.06,1.0600000000000023,m,15.845,78.0375

@@ -1,0 +1,17 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 048-MGD3VNS
+# station_name: Devkali
+# latitude: 25.54416666666667
+# longitude: 83.32666666666667
+# river: Gangi
+# rl_zero: 59.0
+# warning_level: nan
+# danger_level: nan
+# hfl: 67.41
+# hfl_date: 2019-10-02
+station_code,time,wse,water_depth,unit,lat,lon
+048-MGD3VNS,2024-01-01 08:00:00,61.78,2.780000000000001,m,25.54416666666667,83.32666666666667
+048-MGD3VNS,2024-01-01 13:00:00,61.78,2.780000000000001,m,25.54416666666667,83.32666666666667
+048-MGD3VNS,2024-01-01 18:00:00,61.77,2.770000000000003,m,25.54416666666667,83.32666666666667

@@ -1,0 +1,17 @@
+# SWIFT Hydrological Timeseries
+# source: CWC
+# dataset: water_level
+# station_code: 029-mgd3vns
+# station_name: Ahraura
+# latitude: 25.08277777777778
+# longitude: 82.92083333333333
+# river: Jirgo
+# rl_zero: 71.0
+# warning_level: nan
+# danger_level: nan
+# hfl: 76.8
+# hfl_date: 2020-08-21
+station_code,time,wse,water_depth,unit,lat,lon
+029-mgd3vns,2024-01-01 08:00:00,72.87,1.8700000000000045,m,25.08277777777778,82.92083333333333
+029-mgd3vns,2024-01-01 13:00:00,72.87,1.8700000000000045,m,25.08277777777778,82.92083333333333
+029-mgd3vns,2024-01-01 18:00:00,72.88,1.8799999999999955,m,25.08277777777778,82.92083333333333
