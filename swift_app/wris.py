@@ -464,9 +464,15 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
 
             start_slug = (args.start_date or "1950-01-01")[:10]
             end_slug = (args.end_date or "").strip()[:10] or time.strftime("%Y-%m-%d")
+            
+            if station_filter and len(station_filter) == 1:
+                gpkg_basename = str(list(station_filter)[0]).strip().lower()
+            else:
+                gpkg_basename = args.basin.lower()
+
             gpkg_path = os.path.join(
                 base_output,
-                f"{args.basin}_{folder}_{start_slug}_{end_slug}.gpkg",
+                f"{gpkg_basename}_{folder}_{start_slug}_{end_slug}.gpkg",
             )
 
             if counter["downloaded"] == 0 and len(stations_for_run) > 0:

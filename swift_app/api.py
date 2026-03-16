@@ -878,6 +878,15 @@ def wris_stations(basin, var, delay=0.25):
             columns=["station_code", "station_name", "latitude",
                       "longitude", "river", "basin", "variable"]
         )
+        var_str = ", ".join(var_list)
+        basin_str = ", ".join(basin_names)
+        print(f" No s tation found for {var_str} in the seletced {basin_str}")
+    else:
+        print(
+            "The station list returned does not guarantee time series data "
+            "availability for all time periods."
+        )
+
     df = df.sort_values(["basin", "variable", "station_code"]).reset_index(drop=True)
     out = SwiftTable(df.copy())
     out.attrs["source"] = "wris"
@@ -885,10 +894,6 @@ def wris_stations(basin, var, delay=0.25):
     out.attrs["basin"] = basin_names
     out.attrs["variable"] = var_list
 
-    print(
-        "The station list returned does not guarantee time series data "
-        "availability for all time periods."
-    )
     return out
 
 
@@ -1208,6 +1213,21 @@ class _CwcNamespace:
         - If both station and basin are provided, only stations present in both are downloaded.
         - If no stations match the basin filter, a ValueError is raised.
         """
+        # Allow passing DataFrames directly as the first positional argument.
+        if isinstance(station, pd.DataFrame):
+            return fetch(
+                station,
+                output_dir=output_dir,
+                start_date=start_date,
+                end_date=end_date,
+                format=format,
+                overwrite=overwrite,
+                merge=merge,
+                plot=plot,
+                quiet=quiet,
+                refresh=refresh,
+            )
+
         return get_cwc_data(
             station=station,
             basin=basin,

@@ -984,44 +984,37 @@ def run_cwc_download(args):
     logger.log("INFO", f"Selected {n_stations} CWC stations after filters")
 
     # ---------------------------------------------------------
-    # Output folder: basin-aware when possible
-    # ---------------------------------------------------------
-    
-    # When called from fetch() with a basin-column table, args.basin is set.
-    # Otherwise infer from the filtered station table if all share one basin.
-    basin_slug = ""
-    if getattr(args, "basin", None):
-        basin_slug = str(args.basin).strip().lower().replace(" ", "_")
-    elif not stations.empty and "basin" in stations.columns:
-        unique_basins = {
-            str(b).strip().lower().replace(" ", "_")
-            for b in stations["basin"].dropna()
-        }
-        if len(unique_basins) == 1:
-            basin_slug = next(iter(unique_basins))
-
-    if basin_slug:
-        base_output = os.path.join(cwc_root, basin_slug, "stations")
-    else:
-        base_output = os.path.join(cwc_root, "stations")
-    os.makedirs(base_output, exist_ok=True)
-    
-    # ---------------------------------------------------------
-    # Resume filter
+    # Resume filter and Output Folders
     # ---------------------------------------------------------
     
     ext = args.format.lower()
     all_codes = [str(row["code"]).strip() for _, row in stations.iterrows()]
 
+    def get_output_dir(row):
+        # When called from fetch() with a basin explicit override (for basin tables), args.basin might be set
+        # However, prioritizing the row's actual basin ensures correctness for explicit station lists.
+        bs = ""
+        if "basin" in row and pd.notna(row["basin"]):
+            bs = str(row["basin"]).strip().lower().replace(" ", "_")
+        if not bs and getattr(args, "basin", None):
+            bs = str(args.basin).strip().lower().replace(" ", "_")
+        if not bs:
+            bs = "unknown"
+        
+        outdir = os.path.join(cwc_root, bs, "stations")
+        os.makedirs(outdir, exist_ok=True)
+        return outdir
+
     if args.overwrite:
-        station_list = list(stations.iterrows())
+        station_list = [(i, row, get_output_dir(row)) for i, row in stations.iterrows()]
     else:
         station_list = []
-        for _, row in stations.iterrows():
+        for i, row in stations.iterrows():
+            outdir = get_output_dir(row)
             code = str(row["code"]).strip()
-            pattern = os.path.join(base_output, f"{code}_*.{ext}")
+            pattern = os.path.join(outdir, f"{code}_*.{ext}")
             if not glob.glob(pattern):
-                station_list.append((_, row))
+                station_list.append((i, row, outdir))
 
     remaining = len(station_list)
     skipped = 0 if args.overwrite else n_stations - remaining
@@ -1043,9 +1036,9 @@ def run_cwc_download(args):
     if remaining > 0:
 
         def _worker(item):
-            _, station_row = item
-            res = download_station(station_row, base_output, args)
-            return (res, station_row["code"])
+            _, station_row, outdir = item
+            res = download_station(station_row, outdir, args)
+            return (res, station_row["code"], outdir)
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
 
@@ -1061,10 +1054,10 @@ def run_cwc_download(args):
             disable=Console.is_quiet
         ):
             try:
-                result, stcode = f.result()
+                result, stcode, outdir = f.result()
                 if result is True:
                     downloaded += 1
-                    downloaded_codes.append(str(stcode).strip())
+                    downloaded_codes.append((str(stcode).strip(), outdir))
                     logger.log("SUCCESS", f"Downloaded {stcode}")
                 elif result is False or result is None:
                     logger.log("WARN", f"Failed or empty data for {stcode}")
@@ -1082,8 +1075,12 @@ def run_cwc_download(args):
         try:
             from .plot_station_timeseries import plot_station
 
-            files = list(Path(base_output).glob("*.csv"))
-            files.extend(Path(base_output).glob("*.xlsx"))
+            outdirs = set(item[2] for item in station_list)
+            
+            files = []
+            for outdir in outdirs:
+                files.extend(list(Path(outdir).glob("*.csv")))
+                files.extend(list(Path(outdir).glob("*.xlsx")))
 
             if not files:
                 Console.warn("No station files found for plotting")
@@ -1127,8 +1124,14 @@ def run_cwc_download(args):
         end_slug = (str(args.end_date)[:10] if args.end_date else _time.strftime("%Y-%m-%d"))
 
         name_parts = ["cwc_waterlevel"]
-        if basin_slug:
+        
+        # If exactly one station was explicitly requested, use that for the name
+        station_filters = getattr(args, "cwc_station", None)
+        if isinstance(station_filters, list) and len(station_filters) == 1:
+             name_parts.append(str(station_filters[0]).strip().lower())
+        elif basin_slug:
             name_parts.append(basin_slug)
+            
         name_parts.extend([start_slug, end_slug])
         gpkg_name = "_".join(name_parts) + ".gpkg"
 
@@ -1141,8 +1144,8 @@ def run_cwc_download(args):
             # time-period aware and does not include stale files.
             ext = args.format.lower()
             merge_files = []
-            for code in downloaded_codes:
-                pattern = os.path.join(base_output, f"{code}_*.{ext}")
+            for code, outdir in downloaded_codes:
+                pattern = os.path.join(outdir, f"{code}_*.{ext}")
                 merge_files.extend(glob.glob(pattern))
 
             if not merge_files:
@@ -1183,7 +1186,7 @@ def run_cwc_download(args):
             f"{runtime}"
         )
         print("-------------------------------------------------------------")
-        print(f"Output directory: {base_output}")
+        print(f"Output directory: {cwc_root}")
         print("-------------------------------------------------------------")
 
     return 0

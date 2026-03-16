@@ -1,0 +1,80 @@
+[2026-03-16 21:44:23] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 21:44:56] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 21:45:16] [INFO] Processing dataset: sediment
+[2026-03-16 21:45:16] [SUCCESS] Downloaded 003-SRDCBE -> 003-SRDCBE_KUDLUR_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 011-CDBNG -> 011-CDBNG_SAKLESHPUR_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 012-SRDCBE -> 012-SRDCBE_ELUNUTHIMANGALAM_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 010- SRDCBE -> 010- SRDCBE_NELLITHURAI_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 003-SWRDKOCHI -> 003-SWRDKOCHI_MUTHANKERA_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 013-CDBNG -> 013-CDBNG_M.H. HALLI_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 005-srdcbe -> 005-srdcbe_THENGUMARAHADA_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 008-SRDCBE -> 008-SRDCBE_SAVANDAPUR_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 018-CDBNG -> 018-CDBNG_T. NARASIPUR_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 017-CDBNG -> 017-CDBNG_AKKIHEBBAL_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 035-SRDCBE -> 035-SRDCBE_Gandhavayal_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 019-CDBNG -> 019-CDBNG_T. BEKKUPE_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 038-SRDCBE -> 038-SRDCBE_Odendurai_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 036-SRDCBE -> 036-SRDCBE_Alandurai_SEDIM.xlsx
+[2026-03-16 21:45:17] [SUCCESS] Downloaded 046-SRDCBE -> 046-SRDCBE_LAKSHMANANPATTI_SEDIM.xlsx
+[2026-03-16 21:45:23] [WARN] No data returned for station: 014-srdcbe
+[2026-03-16 21:45:23] [WARN] No data returned for station: 020-CDBNG
+[2026-03-16 21:45:23] [WARN] No data returned for station: CCN00J5
+[2026-03-16 21:45:23] [INFO] Merging 15 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-16 21:45:24] [INFO] Finished sediment: Downloaded 15, Skipped 0 in 7.5s
+[2026-03-16 21:45:42] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 21:45:57] [INFO] Processing dataset: solar_radiation
+[2026-03-16 21:45:57] [INFO] Finished solar_radiation: Downloaded 0, Skipped 0 in 0.0s
+[2026-03-16 21:45:57] [INFO] Processing dataset: sediment
+[2026-03-16 21:45:57] [INFO] Skipped 15 existing stations
+[2026-03-16 21:46:03] [WARN] No data returned for station: CCN00J5
+[2026-03-16 21:46:04] [WARN] No data returned for station: 020-CDBNG
+[2026-03-16 21:46:04] [WARN] No data returned for station: 014-srdcbe
+[2026-03-16 21:46:04] [WARN] No data in requested time period; skipping merge
+[2026-03-16 21:46:04] [INFO] Finished sediment: Downloaded 0, Skipped 15 in 6.7s
+[2026-03-16 21:57:51] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 21:57:59] [INFO] Processing dataset: sediment
+[2026-03-16 21:57:59] [INFO] Skipped 4 existing stations
+[2026-03-16 21:57:59] [WARN] No data in requested time period; skipping merge
+[2026-03-16 21:57:59] [INFO] Finished sediment: Downloaded 0, Skipped 4 in 0.0s
+[2026-03-16 21:58:09] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 21:58:17] [INFO] Processing dataset: sediment
+[2026-03-16 21:58:17] [SUCCESS] Downloaded 003-SWRDKOCHI -> 003-SWRDKOCHI_MUTHANKERA_SEDIM.xlsx
+[2026-03-16 21:58:17] [SUCCESS] Downloaded 008-SRDCBE -> 008-SRDCBE_SAVANDAPUR_SEDIM.xlsx
+[2026-03-16 21:58:17] [SUCCESS] Downloaded 005-srdcbe -> 005-srdcbe_THENGUMARAHADA_SEDIM.xlsx
+[2026-03-16 21:58:17] [SUCCESS] Downloaded 003-SRDCBE -> 003-SRDCBE_KUDLUR_SEDIM.xlsx
+[2026-03-16 21:58:17] [INFO] Merging 4 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-16 21:58:17] [INFO] Finished sediment: Downloaded 4, Skipped 0 in 0.6s
+[2026-03-16 22:04:17] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 22:04:25] [INFO] Processing dataset: solar_radiation
+[2026-03-16 22:04:25] [INFO] Finished solar_radiation: Downloaded 0, Skipped 0 in 0.0s
+[2026-03-16 22:04:25] [INFO] Processing dataset: sediment
+[2026-03-16 22:04:25] [INFO] Skipped 15 existing stations
+[2026-03-16 22:04:32] [WARN] No data returned for station: 014-srdcbe
+[2026-03-16 22:04:32] [WARN] No data returned for station: 020-CDBNG
+[2026-03-16 22:04:32] [WARN] No data returned for station: CCN00J5
+[2026-03-16 22:04:32] [WARN] No data in requested time period; skipping merge
+[2026-03-16 22:04:32] [INFO] Finished sediment: Downloaded 0, Skipped 15 in 6.7s
+[2026-03-16 22:04:43] [INFO] Starting WRIS download for basin: Cauvery
+[2026-03-16 22:04:52] [INFO] Processing dataset: solar_radiation
+[2026-03-16 22:04:52] [INFO] Finished solar_radiation: Downloaded 0, Skipped 0 in 0.0s
+[2026-03-16 22:04:52] [INFO] Processing dataset: sediment
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 005-srdcbe -> 005-srdcbe_THENGUMARAHADA_SEDIM.xlsx
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 008-SRDCBE -> 008-SRDCBE_SAVANDAPUR_SEDIM.xlsx
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 003-SRDCBE -> 003-SRDCBE_KUDLUR_SEDIM.xlsx
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 003-SWRDKOCHI -> 003-SWRDKOCHI_MUTHANKERA_SEDIM.xlsx
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 013-CDBNG -> 013-CDBNG_M.H. HALLI_SEDIM.xlsx
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 011-CDBNG -> 011-CDBNG_SAKLESHPUR_SEDIM.xlsx
+[2026-03-16 22:04:52] [SUCCESS] Downloaded 012-SRDCBE -> 012-SRDCBE_ELUNUTHIMANGALAM_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 010- SRDCBE -> 010- SRDCBE_NELLITHURAI_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 036-SRDCBE -> 036-SRDCBE_Alandurai_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 017-CDBNG -> 017-CDBNG_AKKIHEBBAL_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 019-CDBNG -> 019-CDBNG_T. BEKKUPE_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 018-CDBNG -> 018-CDBNG_T. NARASIPUR_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 035-SRDCBE -> 035-SRDCBE_Gandhavayal_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 038-SRDCBE -> 038-SRDCBE_Odendurai_SEDIM.xlsx
+[2026-03-16 22:04:53] [SUCCESS] Downloaded 046-SRDCBE -> 046-SRDCBE_LAKSHMANANPATTI_SEDIM.xlsx
+[2026-03-16 22:04:59] [WARN] No data returned for station: 014-srdcbe
+[2026-03-16 22:04:59] [WARN] No data returned for station: 020-CDBNG
+[2026-03-16 22:04:59] [WARN] No data returned for station: CCN00J5
+[2026-03-16 22:04:59] [INFO] Merging 15 file(s) to GeoPackage (2024-01-01 to 2024-01-07)
+[2026-03-16 22:04:59] [INFO] Finished sediment: Downloaded 15, Skipped 0 in 7.7s
