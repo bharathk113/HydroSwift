@@ -9,8 +9,11 @@ Namespaced access (preferred):
 
 Top-level helpers:
     swift.fetch(source, ...)
-    swift.merge(...)
-    swift.plot(...)
+    swift.merge_only(...)
+    swift.plot_only(...)
+    # Backward compatible aliases:
+    swift.merge(...)  # deprecated alias
+    swift.plot(...)   # deprecated alias
 """
 
 from __future__ import annotations
@@ -29,6 +32,76 @@ from .wris import run_wris_download, build_basin_structure, discover_stations
 from .merge import run_merge_only
 from .plot import run_plot_only
 from .cwc import run_cwc_download, get_cwc_station_metadata
+
+
+# ---------------------------------------------------------
+# CLI help bridge for Python API
+# ---------------------------------------------------------
+
+def cli_help():
+    """Print the command-line help text (equivalent to ``swift -h``)."""
+    from .cli import build_parser
+
+    parser = build_parser()
+    parser.print_help()
+    return None
+
+
+def help():
+    """Print Python API-oriented help for interactive users.
+
+    This is designed for notebooks / REPL sessions and mirrors the public API
+    overview documented in ``docs/PUBLIC_API_AND_CLI.md``.
+    """
+    print(
+        """
+SWIFT Python API help
+=====================
+
+Namespaces
+----------
+- swift.wris.download(basin, variable, ...)
+- swift.wris.stations(basin, variable, delay=0.25)
+- swift.cwc.download(station=None, ...)
+- swift.cwc.stations(station=None, basin=None, river=None, state=None, refresh=False)
+
+Core helpers
+------------
+- swift.fetch(stations_df, ...)
+- swift.merge_only(input_dir=None, output_dir=None, mode=None, variable=None)
+- swift.plot_only(input_dir=None, output_dir=None, cwc=False, mode=None, variable=None)
+
+Backward-compatible aliases
+---------------------------
+- swift.merge(...)
+- swift.plot(...)
+
+Utility helpers
+---------------
+- swift.cite()
+- swift.coffee()
+- swift.wris.variables()  (WRIS variable table)
+- swift.wris.basins(variable=...)  (WRIS basin table; optionally expanded by variable)
+- swift.cwc.basins()      (CWC basin table from station metadata)
+
+Quick examples
+--------------
+1) Download WRIS discharge for Krishna:
+    swift.wris.download(basin="Krishna", variable="discharge")
+
+2) Query stations then fetch:
+    stations = swift.wris.stations(basin=["Godavari", "Krishna"], variable=["solar", "sediment"])
+    swift.fetch(stations, output_dir="output", merge=True, plot=True)
+
+3) Download CWC data:
+    swift.cwc.download(station=["040-CDJAPR"], start_date="2024-01-01", end_date="2024-01-07")
+
+Need CLI help instead?
+----------------------
+Use: swift.cli_help()   # equivalent to `swift -h`
+        """.strip()
+    )
+    return None
 
 
 # ---------------------------------------------------------
@@ -135,6 +208,7 @@ def _build_args(**kwargs):
     args.quiet = kwargs.get("quiet", False)
     args.cwc = kwargs.get("cwc", False)
     args.cwc_station = kwargs.get("cwc_station")
+    args.cwc_basin_filter = kwargs.get("cwc_basin_filter")
     args.stations = kwargs.get("stations")
     args.cwc_refresh = kwargs.get("cwc_refresh", False)
     dataset_keys = ["q", "wl", "atm", "rf", "temp", "rh", "solar", "sed", "gwl"]
@@ -189,7 +263,7 @@ def get_wris_data(
         (``'discharge'``, ``'water_level'``, ``'rainfall'``, etc.)
         or short codes (``'q'``, ``'wl'``, ``'rf'``).
     basin : str or int
-        Basin name or number (see ``swift.basins()``).
+        Basin name or number (see ``swift.wris.basins()``).
     station : str or list[str], optional
         Limit to specific station code(s).
     start_date, end_date : str
@@ -401,9 +475,11 @@ def get_cwc_data(
     ----------
     station : str or list[str], optional
         CWC station code(s).  Downloads all stations when omitted.
-    basin : str, optional
-        When provided (e.g. from fetch with a basin-column table), files
-        are saved under ``output_dir/cwc/<basin>/stations/``.
+    basin : str or list[str], optional
+        Basin name filter(s), case-insensitive substring match against
+        CWC station metadata. When provided, download is restricted to
+        matching stations (similar to ``fetch()`` behavior). Files are
+        saved under basin-aware folders when a single basin is requested.
     var : ignored
         Accepted for API symmetry with :func:`get_wris_data` but CWC
         only provides water level.  A warning is raised if a non-water-
@@ -455,6 +531,51 @@ def get_cwc_data(
 
     cwc_station = _normalize_cwc_station_input(station)
 
+    # Resolve basin filters to station codes so direct namespace calls like
+    # swift.cwc.download(basin=["Krishna", "Godavari"], ...) behave like
+    # fetch() and WRIS downloads.
+    basins = []
+    if basin is not None:
+        if isinstance(basin, str):
+            basins = [basin.strip()] if basin.strip() else []
+        elif isinstance(basin, (list, tuple, set)):
+            basins = [str(b).strip() for b in basin if str(b).strip()]
+        else:
+            one = str(basin).strip()
+            basins = [one] if one else []
+
+    if basins:
+        basin_meta = cwc_stations(basin=basins, refresh=refresh)
+        basin_codes = sorted(
+            {
+                str(c).strip()
+                for c in basin_meta["code"].dropna().tolist()
+                if str(c).strip()
+            }
+        )
+
+        if not basin_codes:
+            raise ValueError(
+                "No matching CWC stations found for basin filter: "
+                f"{', '.join(basins)}"
+            )
+
+        if cwc_station is None:
+            cwc_station = basin_codes
+        else:
+            cwc_station = sorted(set(cwc_station).intersection(basin_codes))
+            if not cwc_station:
+                raise ValueError(
+                    "No overlap between requested station code(s) and basin filter. "
+                    f"Basin filter: {', '.join(basins)}"
+                )
+
+    # Preserve existing folder convention for single-basin inputs while still
+    # supporting multi-basin filtering in one call.
+    basin_arg = basin
+    if isinstance(basin, (list, tuple, set)):
+        basin_arg = basin[0] if len(basin) == 1 else None
+
     # Always enable on-disk GeoPackage merging; the *merge* flag controls
     # only whether a concatenated GeoDataFrame is returned from this
     # Python API, not whether files are merged on disk.
@@ -462,7 +583,8 @@ def get_cwc_data(
         cwc=True,
         cwc_station=cwc_station,
         cwc_refresh=refresh,
-        basin=basin,
+        basin=basin_arg,
+        cwc_basin_filter=basins,
         start_date=start_date or "1950-01-01",
         end_date=end_date,
         overwrite=overwrite,
@@ -713,6 +835,7 @@ def wris_stations(basin, var, delay=0.25):
     df = df.sort_values(["basin", "variable", "station_code"]).reset_index(drop=True)
     out = SwiftTable(df.copy())
     out.attrs["source"] = "wris"
+    out.attrs["fetch_source"] = "wris"
     out.attrs["basin"] = basin_names
     out.attrs["variable"] = var_list
 
@@ -769,6 +892,7 @@ def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False
     )
     out = SwiftTable(df.copy())
     out.attrs["source"] = "cwc"
+    out.attrs["fetch_source"] = "cwc"
     if basin is not None:
         out.attrs["basin"] = [basin] if isinstance(basin, str) else list(basin)
     if state is not None:
@@ -820,10 +944,17 @@ class _WrisNamespace:
         delay : float
             Seconds between API requests.
         """
+        if station is not None:
+            raise ValueError(
+                "swift.wris.download() does not support station-level filtering. "
+                "Use basin + variable combinations (or call swift.fetch(...) with "
+                "a WRIS station table)."
+            )
+
         return get_wris_data(
             var=variable,
             basin=basin,
-            station=station,
+            station=None,
             start_date=start_date,
             end_date=end_date,
             output_dir=output_dir,
@@ -876,6 +1007,103 @@ class _WrisNamespace:
             )
         return wris_stations(basin=basin, var=variable, delay=delay)
 
+    @staticmethod
+    def variables():
+        """Return the supported WRIS variables as a table.
+
+        Returns
+        -------
+        SwiftTable
+            Columns: ``flag``, ``dataset_code``, ``folder``, ``canonical_name``,
+            ``aliases``.
+        """
+        canonical_by_flag = {
+            "q": "discharge",
+            "wl": "water_level",
+            "atm": "atm_pressure",
+            "rf": "rainfall",
+            "temp": "temperature",
+            "rh": "humidity",
+            "solar": "solar_radiation",
+            "sed": "sediment",
+            "gwl": "groundwater_level",
+        }
+        alias_map: dict[str, list[str]] = {}
+        for alias, flag in DATASET_ALIAS.items():
+            alias_map.setdefault(flag, []).append(alias)
+
+        records = []
+        for flag, (dataset_code, folder) in DATASETS.items():
+            aliases = sorted(set(alias_map.get(flag, [])))
+            records.append(
+                {
+                    "flag": flag,
+                    "dataset_code": dataset_code,
+                    "folder": folder,
+                    "canonical_name": canonical_by_flag.get(flag, folder),
+                    "aliases": aliases,
+                }
+            )
+
+        out = SwiftTable(pd.DataFrame(records))
+        out.attrs["source"] = "wris"
+        out.attrs["type"] = "variables"
+        return out
+
+    @staticmethod
+    def basins(variable=None):
+        """Return WRIS basins as a table.
+
+        Parameters
+        ----------
+        variable : str or list[str], optional
+            When provided, expands the table to one row per
+            ``(basin, variable)`` pair so it can be passed directly to
+            ``swift.fetch(...)`` for full-basin downloads.
+        """
+        base_records = [{"id": k, "basin": v} for k, v in WRIS_BASINS.items()]
+
+        var_list: list[str] = []
+        if variable is not None:
+            if isinstance(variable, str):
+                raw_vars = [variable]
+            elif isinstance(variable, (list, tuple, set)):
+                raw_vars = list(variable)
+            else:
+                raw_vars = [str(variable)]
+
+            for v in raw_vars:
+                vv = str(v).strip()
+                if not vv:
+                    continue
+                # Validate variable names/flags early with the same resolver
+                # used by download/stations.
+                _resolve_variable(vv)
+                var_list.append(vv)
+
+            if not var_list:
+                raise ValueError(
+                    "variable must include at least one valid value "
+                    "(for example: 'discharge' or ['solar', 'sediment'])."
+                )
+
+        if var_list:
+            records = []
+            for rec in base_records:
+                for v in var_list:
+                    records.append({"id": rec["id"], "basin": rec["basin"], "variable": v})
+        else:
+            records = base_records
+
+        out = SwiftTable(pd.DataFrame(records))
+        out.attrs["source"] = "wris"
+        out.attrs["fetch_source"] = "wris"
+        out.attrs["type"] = "basins"
+        out.attrs["basin"] = [rec["basin"] for rec in base_records]
+        if var_list:
+            out.attrs["variable"] = var_list
+        return out
+
 
 class _CwcNamespace:
     """``swift.cwc`` namespace for CWC flood-forecast operations."""
@@ -895,14 +1123,15 @@ class _CwcNamespace:
         quiet=False,
         refresh=False,
     ):
-        """Download CWC water-level time-series data.
+        """
+        Download CWC water-level time-series data.
 
         Parameters
         ----------
         station : str or list[str], optional
-            CWC station code(s).  Downloads all when omitted.
-        basin : str, optional
-            When set, files are saved under ``output_dir/cwc/<basin>/stations/``.
+            CWC station code(s). Downloads all when omitted. If both station and basin are provided, only stations in both sets are downloaded.
+        basin : str or list[str], optional
+            Basin filter(s) for station selection. Supports single or multiple basin names. If provided, only stations matching the basin(s) are downloaded (case-insensitive substring match).
         start_date, end_date : str, optional
             ISO date strings.
         output_dir : str
@@ -911,6 +1140,12 @@ class _CwcNamespace:
         overwrite, merge, plot, quiet : bool
         refresh : bool
             Refresh station metadata before downloading.
+
+        Notes
+        -----
+        - Basin filtering is supported for CWC downloads and is applied before download. This mirrors the behavior of fetch() and WRIS downloads.
+        - If both station and basin are provided, only stations present in both are downloaded.
+        - If no stations match the basin filter, a ValueError is raised.
         """
         return get_cwc_data(
             station=station,
@@ -942,6 +1177,54 @@ class _CwcNamespace:
             refresh=refresh,
         )
 
+    @staticmethod
+    def basins(refresh=False):
+        """Return CWC basins with station counts from CWC station metadata.
+
+        Parameters
+        ----------
+        refresh : bool, default False
+            If True, refresh station metadata from the CWC API before
+            summarising basins.
+        """
+        df = get_cwc_station_metadata(refresh=refresh)
+        if "basin" not in df.columns:
+            out = SwiftTable(pd.DataFrame(columns=["basin", "station_count"]))
+            out.attrs["source"] = "cwc"
+            out.attrs["fetch_source"] = "cwc"
+            out.attrs["type"] = "basins"
+            out.attrs["basin"] = []
+            return out
+
+        basin_series = (
+            df["basin"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+        basin_series = basin_series[basin_series != ""]
+        if basin_series.empty:
+            out = SwiftTable(pd.DataFrame(columns=["basin", "station_count"]))
+            out.attrs["source"] = "cwc"
+            out.attrs["fetch_source"] = "cwc"
+            out.attrs["type"] = "basins"
+            out.attrs["basin"] = []
+            return out
+
+        summary = (
+            basin_series.value_counts()
+            .rename_axis("basin")
+            .reset_index(name="station_count")
+            .sort_values("basin")
+            .reset_index(drop=True)
+        )
+        out = SwiftTable(summary)
+        out.attrs["source"] = "cwc"
+        out.attrs["fetch_source"] = "cwc"
+        out.attrs["type"] = "basins"
+        out.attrs["basin"] = summary["basin"].tolist()
+        return out
+
 
 wris = _WrisNamespace()
 cwc_ns = _CwcNamespace()
@@ -965,16 +1248,23 @@ def fetch(
     delay=0.25,
     refresh=False,
 ):
-    """Download data for a station table returned by ``wris.stations`` / ``cwc.stations``.
+    """Download data for a SWIFT table returned by stations/basins helpers.
 
     Parameters
     ----------
-    stations : pandas.DataFrame
-        Station table.  For WRIS tables produced by
-        ``swift.wris.stations()`` the DataFrame contains per-row
-        ``basin`` and ``variable`` columns; ``fetch`` groups by these
-        and dispatches each (basin, variable) combination separately.
-        For CWC it should include ``code`` and attrs ``source='cwc'``.
+        stations : pandas.DataFrame
+                SWIFT table (typically from ``swift.wris.stations()``,
+                ``swift.cwc.stations()``, ``swift.wris.basins(variable=...)`` or
+                ``swift.cwc.basins()``).
+
+                - WRIS station tables include ``station_code`` and optionally
+                    per-row ``basin``/``variable`` columns.
+                - WRIS basin tables are basin-level inputs and require variable
+                    information either in a ``variable`` column or
+                    ``stations.attrs['variable']``.
+                - CWC station tables include ``code``.
+                - CWC basin tables include basin information (column or attrs),
+                    and fetch expands to all stations in each basin.
     output_dir : str
         Root output directory.
     start_date, end_date : str
@@ -1002,11 +1292,18 @@ def fetch(
             "swift.wris.stations(...) or swift.cwc.stations(...)."
         )
 
-    source = stations.attrs.get("source")
+    source = stations.attrs.get("source") or stations.attrs.get("fetch_source")
+    table_type = str(stations.attrs.get("type", "")).lower().strip()
     if not source:
         if "station_code" in stations.columns:
             source = "wris"
+        elif "variable" in stations.columns:
+            source = "wris"
+        elif table_type == "basins" and stations.attrs.get("variable") is not None:
+            source = "wris"
         elif "code" in stations.columns:
+            source = "cwc"
+        elif "station_count" in stations.columns:
             source = "cwc"
         else:
             raise ValueError(
@@ -1016,14 +1313,124 @@ def fetch(
 
     source = str(source).lower().strip()
     if source == "wris":
-        if "station_code" not in stations.columns:
-            raise ValueError("WRIS stations table must include 'station_code' column.")
+        has_station_codes = "station_code" in stations.columns
+        has_basin_col = "basin" in stations.columns
+        has_variable_col = "variable" in stations.columns
+        has_group_cols = (has_basin_col and has_variable_col)
 
-        has_group_cols = (
-            "basin" in stations.columns and "variable" in stations.columns
-        )
+        variable_attr = stations.attrs.get("variable")
+        variable_attr_list = []
+        if variable_attr is not None:
+            if isinstance(variable_attr, str):
+                variable_attr_list = [variable_attr]
+            elif isinstance(variable_attr, (list, tuple, set)):
+                variable_attr_list = [str(v) for v in variable_attr]
+            else:
+                variable_attr_list = [str(variable_attr)]
+            variable_attr_list = [v.strip() for v in variable_attr_list if str(v).strip()]
 
-        if has_group_cols:
+        # Basin-level WRIS fetch from swift.wris.basins(variable=...):
+        # table includes basin/variable but does not include station_code.
+        if (has_group_cols or (has_basin_col and variable_attr_list)) and not has_station_codes:
+            basin_values = []
+            if has_basin_col:
+                basin_values = sorted(
+                    {
+                        str(v).strip()
+                        for v in stations["basin"].dropna().tolist()
+                        if str(v).strip()
+                    }
+                )
+            elif stations.attrs.get("basin") is not None:
+                raw_basins = stations.attrs.get("basin")
+                if isinstance(raw_basins, str):
+                    basin_values = [raw_basins.strip()] if raw_basins.strip() else []
+                elif isinstance(raw_basins, (list, tuple, set)):
+                    basin_values = sorted({str(b).strip() for b in raw_basins if str(b).strip()})
+                else:
+                    one = str(raw_basins).strip()
+                    basin_values = [one] if one else []
+
+            if has_variable_col:
+                variable_values = sorted(
+                    {
+                        str(v).strip()
+                        for v in stations["variable"].dropna().tolist()
+                        if str(v).strip()
+                    }
+                )
+            else:
+                variable_values = variable_attr_list
+
+            if not basin_values or not variable_values:
+                raise ValueError(
+                    "WRIS basin table has no valid basin/variable pairs. "
+                    "Use swift.wris.basins(variable=...) or provide non-empty "
+                    "'basin' and 'variable' columns."
+                )
+
+            if has_group_cols:
+                combo_df = stations[["basin", "variable"]].dropna().copy()
+                combo_df["basin"] = combo_df["basin"].astype(str).str.strip()
+                combo_df["variable"] = combo_df["variable"].astype(str).str.strip()
+                combo_df = combo_df[
+                    (combo_df["basin"] != "") & (combo_df["variable"] != "")
+                ]
+                unique_combos = sorted(
+                    {
+                        (row["basin"], row["variable"])
+                        for _, row in combo_df.iterrows()
+                    },
+                    key=lambda x: (x[0], x[1]),
+                )
+            else:
+                unique_combos = sorted(
+                    {
+                        (b, v)
+                        for b in basin_values
+                        for v in variable_values
+                    },
+                    key=lambda x: (x[0], x[1]),
+                )
+
+            # Explicit warning because this path downloads all stations per basin.
+            warnings.warn(
+                "Fetching WRIS data for basin-level input (all stations per basin/variable). "
+                f"Dispatching {len(unique_combos)} basin-variable combinations; "
+                "this may take a long time.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+            try:
+                import pandas as _pd  # type: ignore[import]
+            except Exception:
+                _pd = None
+
+            frames = []
+            for grp_basin, grp_variable in unique_combos:
+                res = wris.download(
+                    basin=grp_basin,
+                    variable=grp_variable,
+                    station=None,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    format=format,
+                    overwrite=overwrite,
+                    merge=merge,
+                    plot=plot,
+                    delay=delay,
+                    quiet=quiet,
+                )
+                if res is not None and _pd is not None and hasattr(res, "assign"):
+                    frames.append(res.assign(basin=str(grp_basin), variable=str(grp_variable)))
+
+            if not frames or _pd is None:
+                return None
+            return _pd.concat(frames, ignore_index=True)
+
+        if has_group_cols and has_station_codes:
             groups = stations.groupby(["basin", "variable"], sort=True)
             try:
                 import pandas as _pd  # type: ignore[import]
@@ -1040,9 +1447,9 @@ def fetch(
                 )
                 if not codes:
                     continue
-                res = wris.download(
+                res = get_wris_data(
+                    var=grp_variable,
                     basin=grp_basin,
-                    variable=grp_variable,
                     station=codes,
                     start_date=start_date,
                     end_date=end_date,
@@ -1061,6 +1468,12 @@ def fetch(
                 return None
             return _pd.concat(frames, ignore_index=True)
 
+        if not has_station_codes:
+            raise ValueError(
+                "WRIS input table must include either 'station_code' (for station-level fetch) "
+                "or both 'basin' and 'variable' columns (for basin-level fetch)."
+            )
+
         basin = stations.attrs.get("basin")
         variable = stations.attrs.get("variable")
         if basin is None or variable is None:
@@ -1077,9 +1490,9 @@ def fetch(
         )
         if not station_codes:
             raise ValueError("WRIS station table has no valid station_code entries.")
-        return wris.download(
+        return get_wris_data(
+            var=variable,
             basin=basin,
-            variable=variable,
             station=station_codes,
             start_date=start_date,
             end_date=end_date,
@@ -1093,10 +1506,74 @@ def fetch(
         )
 
     if source == "cwc":
-        if "code" not in stations.columns:
-            raise ValueError("CWC stations table must include 'code' column.")
-
+        has_code_col = "code" in stations.columns
         has_basin_col = "basin" in stations.columns
+
+        # Basin-level CWC fetch from swift.cwc.basins(): table includes
+        # basin names and station counts, but no explicit station codes.
+        if has_basin_col and not has_code_col:
+            basin_df = stations[["basin"]].dropna().copy()
+            basin_df["basin"] = basin_df["basin"].astype(str).str.strip()
+            basin_df = basin_df[basin_df["basin"] != ""]
+            if basin_df.empty:
+                raise ValueError(
+                    "CWC basin table has no valid basin values. "
+                    "Use swift.cwc.basins() or provide a non-empty 'basin' column."
+                )
+
+            unique_basins = sorted({row["basin"] for _, row in basin_df.iterrows()})
+
+            warnings.warn(
+                "Fetching CWC data for basin-level input (all stations per basin). "
+                f"Dispatching {len(unique_basins)} basins; this may take a long time.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+            try:
+                import pandas as _pd  # type: ignore[import]
+            except Exception:
+                _pd = None
+
+            frames = []
+            for grp_basin in unique_basins:
+                basin_stations = cwc_ns.stations(
+                    basin=grp_basin,
+                    refresh=refresh,
+                )
+                if "code" not in basin_stations.columns:
+                    continue
+                codes = sorted(
+                    {
+                        str(c).strip()
+                        for c in basin_stations["code"].dropna().tolist()
+                        if str(c).strip()
+                    }
+                )
+                if not codes:
+                    continue
+                res = cwc_ns.download(
+                    station=codes,
+                    basin=grp_basin,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    format=format,
+                    overwrite=overwrite,
+                    merge=merge,
+                    plot=plot,
+                    quiet=quiet,
+                    refresh=refresh,
+                )
+                if res is not None and _pd is not None and hasattr(res, "assign"):
+                    frames.append(res.assign(basin=str(grp_basin)))
+
+            if not frames or _pd is None:
+                return None
+            return _pd.concat(frames, ignore_index=True)
+
+        if not has_code_col:
+            raise ValueError("CWC stations table must include 'code' column.")
 
         if has_basin_col:
             # Group by basin so each group is saved under output_dir/cwc/<basin>/stations/
@@ -1181,7 +1658,7 @@ def _resolve_mode_input_dir(mode, output_dir):
     raise ValueError(f"Unknown mode: {mode!r}. Use 'wris' or 'cwc'.")
 
 
-def merge(
+def merge_only(
     input_dir=None,
     output_dir=None,
     *,
@@ -1215,7 +1692,7 @@ def merge(
     )
     if mode == "cwc" and _var_list:
         warnings.warn(
-            "swift.merge(mode='cwc', ...) ignores variable; CWC data only has water levels.",
+            "swift.merge_only(mode='cwc', ...) ignores variable; CWC data only has water levels.",
             UserWarning,
             stacklevel=2,
         )
@@ -1387,7 +1864,7 @@ def merge(
         _shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def plot(
+def plot_only(
     input_dir=None,
     output_dir=None,
     cwc=False,
@@ -1423,7 +1900,7 @@ def plot(
     )
     if (mode == "cwc" or cwc) and _var_list:
         warnings.warn(
-            "swift.plot(mode='cwc', ...) ignores variable; CWC data only has water levels.",
+            "swift.plot_only(mode='cwc', ...) ignores variable; CWC data only has water levels.",
             UserWarning,
             stacklevel=2,
         )
@@ -1454,6 +1931,40 @@ def plot(
     return None
 
 
+def merge(
+    input_dir=None,
+    output_dir=None,
+    *,
+    mode=None,
+    variable=None,
+):
+    """Backward-compatible alias for :func:`merge_only`."""
+    return merge_only(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        mode=mode,
+        variable=variable,
+    )
+
+
+def plot(
+    input_dir=None,
+    output_dir=None,
+    cwc=False,
+    *,
+    mode=None,
+    variable=None,
+):
+    """Backward-compatible alias for :func:`plot_only`."""
+    return plot_only(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        cwc=cwc,
+        mode=mode,
+        variable=variable,
+    )
+
+
 # ---------------------------------------------------------
 # SwiftTable (DataFrame wrapper for nicer notebook display)
 # ---------------------------------------------------------
@@ -1478,52 +1989,6 @@ class SwiftTable(pd.DataFrame):
 # ---------------------------------------------------------
 # Notebook helpers  (tab-completion namespaces)
 # ---------------------------------------------------------
-
-class _DatasetNamespace:
-    """Provides tab-completion for dataset names in notebooks."""
-
-    discharge = "discharge"
-    water_level = "water_level"
-    atm_pressure = "atm_pressure"
-    rainfall = "rainfall"
-    temperature = "temperature"
-    humidity = "humidity"
-    solar = "solar"
-    solar_radiation = "solar_radiation"
-    sediment = "sediment"
-    groundwater = "groundwater"
-    groundwater_level = "groundwater_level"
-
-    def __call__(self):
-        return [
-            self.discharge, self.water_level, self.atm_pressure,
-            self.rainfall, self.temperature, self.humidity,
-            self.solar, self.solar_radiation, self.sediment,
-            self.groundwater, self.groundwater_level,
-        ]
-
-
-datasets = _DatasetNamespace()
-
-
-class _BasinNamespace:
-    """Tab-completion helper for basin names."""
-
-    def __init__(self, basin_mapping):
-        self._mapping = basin_mapping
-        for code, name in basin_mapping.items():
-            key = name.lower()
-            key = re.sub(r"[^\w]+", "_", key)
-            key = re.sub(r"_+", "_", key).strip("_")
-            setattr(self, key, name)
-
-    def __call__(self):
-        records = [{"id": k, "basin": v} for k, v in self._mapping.items()]
-        return SwiftTable(pd.DataFrame(records))
-
-
-basins = _BasinNamespace(WRIS_BASINS)
-
 
 # ---------------------------------------------------------
 # Citation / Easter eggs

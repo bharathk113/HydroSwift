@@ -781,6 +781,31 @@ def run_cwc_download(args):
             logger.log("ERROR", "No matching CWC stations found")
             raise SystemExit("No matching CWC stations found")
 
+    # Optional basin filter (case-insensitive substring matching) to
+    # mirror swift.cwc.stations(..., basin=...) behavior. This acts as
+    # a defensive filter in case only basin names are provided upstream.
+    basin_filters = getattr(args, "cwc_basin_filter", None)
+    if basin_filters:
+        if isinstance(basin_filters, str):
+            basin_filters = [basin_filters]
+        basin_filters = [str(b).strip() for b in basin_filters if str(b).strip()]
+        if basin_filters and "basin" in stations.columns:
+            basin_mask = pd.Series(False, index=stations.index)
+            basin_series = stations["basin"].astype(str)
+            for b in basin_filters:
+                basin_mask |= basin_series.str.lower().str.contains(b.lower(), na=False)
+            stations = stations[basin_mask]
+            if stations.empty:
+                logger.log(
+                    "ERROR",
+                    "No matching CWC stations found for basin filter: "
+                    + ", ".join(basin_filters),
+                )
+                raise SystemExit(
+                    "No matching CWC stations found for basin filter: "
+                    + ", ".join(basin_filters)
+                )
+
     n_stations = len(stations)
 
     start_year = str(args.start_date)[:4] if args.start_date else "1950"
@@ -791,6 +816,8 @@ def run_cwc_download(args):
         f"Mode: CWC download | Stations: {n_stations} | "
         f"Format: {fmt} | Time range: {start_year}\u2013{end_year}"
     )
+    if basin_filters:
+        Console.info("Basin filter: " + ", ".join(basin_filters))
     
     if not Console.is_quiet:
         print(f"{Console.ITALIC}Note: The CWC servers stream full historical datasets at slow speeds (~100 KB/s).{Console.RESET}")

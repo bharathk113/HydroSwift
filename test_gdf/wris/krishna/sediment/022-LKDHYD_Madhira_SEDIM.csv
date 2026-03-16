@@ -1,9 +1,0 @@
-# SWIFT Hydrological Timeseries
-# source: WRIS
-# dataset: SEDIM
-# station_code: 022-LKDHYD
-# station_name: Madhira
-# latitude: 16.9181
-# longitude: 80.3589
-station_code,time,sed,lat,lon
-022-LKDHYD,2024-01-01 08:00:00,0.0,16.9181,80.3589

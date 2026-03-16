@@ -8,19 +8,27 @@ All callable functions and main methods, grouped by module. Arguments are listed
 
 Access via `import swift_app`. Only these are part of the stable public API.
 
+Legacy migration:
+- Removed: `swift.datasets`
+- Removed: `swift.basins()`
+- Use: `swift_app.wris.variables()`, `swift_app.wris.basins()`, `swift_app.cwc.basins()`
+
 | Function / method | Description | Arguments |
 |-------------------|-------------|-----------|
 | **swift_app.wris.download** | Download WRIS time-series data to disk. | `basin` (str\|int), `variable` (str\|list), \*, `station=None`, `start_date="1950-01-01"`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `delay=0.25`, `quiet=False` |
 | **swift_app.wris.stations** | List WRIS stations for one or more basins/variables (returns SwiftTable with per-row `basin` and `variable` columns). | `basin` (str\|int\|list), `variable` (str\|list, required), `delay=0.25` |
-| **swift_app.cwc.download** | Download CWC water-level time-series to disk. | `station=None`, \*, `start_date=None`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `refresh=False` |
+| **swift_app.wris.variables** | Return WRIS variable table (`flag`, `dataset_code`, `folder`, `canonical_name`, `aliases`). | (none) |
+| **swift_app.wris.basins** | Return WRIS basin id/name table. | (none) |
+| **swift_app.cwc.download** | Download CWC water-level time-series to disk. | `station=None`, \*, `basin=None`, `start_date=None`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `refresh=False` |
 | **swift_app.cwc.stations** | Return CWC station metadata (SwiftTable). | `station=None`, `basin=None`, `river=None`, `state=None`, `refresh=False` |
+| **swift_app.cwc.basins** | Return CWC basin table with station counts from station metadata. | `refresh=False` |
 | **swift_app.fetch** | Download using a WRIS/CWC stations table. For multi-basin/variable WRIS tables, groups by `(basin, variable)` and dispatches each combination. | `stations` (DataFrame/SwiftTable from `wris.stations` or `cwc.stations`), \* `output_dir="output"`, `start_date="1950-01-01"`, `end_date=None`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `delay=0.25`, `refresh=False` |
-| **swift_app.merge** | Merge existing SWIFT station files into GeoPackages. Basins/agencies are auto-discovered from the directory layout. | `input_dir=None`, `output_dir=None`, \*, `mode=None`, `variable=None` |
-| **swift_app.plot** | Generate hydrograph plots from existing SWIFT output. Basins/agencies are auto-discovered from the directory layout. | `input_dir=None`, `output_dir=None`, `cwc=False`, \*, `mode=None`, `variable=None` |
+| **swift_app.merge_only** | Merge existing SWIFT station files into GeoPackages. Basins/agencies are auto-discovered from the directory layout. | `input_dir=None`, `output_dir=None`, \*, `mode=None`, `variable=None` |
+| **swift_app.plot_only** | Generate hydrograph plots from existing SWIFT output. Basins/agencies are auto-discovered from the directory layout. | `input_dir=None`, `output_dir=None`, `cwc=False`, \*, `mode=None`, `variable=None` |
+| **swift_app.merge** | Backward-compatible alias for `swift_app.merge_only`. | `input_dir=None`, `output_dir=None`, \*, `mode=None`, `variable=None` |
+| **swift_app.plot** | Backward-compatible alias for `swift_app.plot_only`. | `input_dir=None`, `output_dir=None`, `cwc=False`, \*, `mode=None`, `variable=None` |
 | **swift_app.cite** | Print banner and citation text. | (none) |
 | **swift_app.coffee** | Easter egg: print coffee-break message. | (none) |
-
-**Helpers (read-only / tab-completion):** `swift_app.datasets`, `swift_app.basins` (callable to get a table).
 
 ---
 
@@ -41,7 +49,7 @@ Functions used by the public API; not guaranteed stable. Prefer the public API a
 | **_build_args** | Build a SimpleNamespace of CLI-like args from kwargs. | `**kwargs` |
 | **_resolve_basin** | Map basin int/name to canonical basin name. | `basin` |
 | **_resolve_variable** | Normalise a variable string to its dataset flag. | `var` |
-| **_discover_basin_variable** | Discover WRIS stations for a single (basin, variable) pair. | `client`, `basin_name`, `dataset_code`, `dataset_flag` |
+| **_discover_station_codes** | Discover WRIS station codes and river fallbacks for one (basin, variable). | `client`, `basin_code`, `basin_structure`, `dataset_code` |
 | **_resolve_mode_input_dir** | Derive `input_dir` from `mode` (root containing ``wris/`` and ``cwc/``). | `mode`, `output_dir` |
 
 ---

@@ -287,9 +287,21 @@ def test_cwc_namespace_download_dispatches(monkeypatch):
     monkeypatch.setattr(api_mod, "run_cwc_download", fake_run_cwc_download)
 
     api_mod.cwc_ns.download(station=["040-CDJAPR"], quiet=True)
-
     assert calls["cwc"] is True
     assert calls["stations"] == ["040-CDJAPR"]
+
+def test_cwc_namespace_download_basin_filter(monkeypatch):
+    import swift_app.api as api_mod
+    calls = {}
+    def fake_run_cwc_download(args):
+        calls["cwc"] = args.cwc
+        calls["stations"] = args.cwc_station
+        calls["basin_filter"] = args.cwc_basin_filter
+    monkeypatch.setattr(api_mod, "run_cwc_download", fake_run_cwc_download)
+    # Should filter by basin and pass correct args
+    api_mod.cwc_ns.download(basin=["Krishna", "Godavari"], quiet=True)
+    assert calls["cwc"] is True
+    assert calls["basin_filter"] == ["Krishna", "Godavari"]
 
 
 def test_wris_namespace_stations(monkeypatch):
@@ -552,6 +564,60 @@ def test_fetch_dispatches_multi_basin_variable_groups(monkeypatch, tmp_path):
             assert sorted(c["stations"]) == ["S3", "S4"]
 
 
+def test_fetch_wris_basin_table_dispatches_all_station_downloads(monkeypatch, tmp_path):
+    """fetch() should accept wris.basins(variable=...) style tables."""
+    import swift_app.api as api_mod
+
+    class DummyClient:
+        def __init__(self, delay=0.25):
+            self.delay = delay
+
+        def check_api(self):
+            return True
+
+        def get_basin_code(self, basin):
+            return {"Godavari": "5", "Narmada": "4"}[basin]
+
+    calls = []
+
+    def fake_run_wris_download(args, selected, client, basin_code):
+        calls.append(
+            {
+                "basin": args.basin,
+                "variable_flags": sorted(selected.keys()),
+                "stations": getattr(args, "stations", None),
+                "basin_code": basin_code,
+            }
+        )
+
+    monkeypatch.setattr(api_mod, "WrisClient", DummyClient)
+    monkeypatch.setattr(api_mod, "run_wris_download", fake_run_wris_download)
+
+    basins = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "id": ["5", "4"],
+                "basin": ["Godavari", "Narmada"],
+                "variable": ["discharge", "discharge"],
+            }
+        )
+    )
+    basins.attrs["source"] = "wris"
+    basins.attrs["type"] = "basins"
+
+    with pytest.warns(UserWarning, match="may take a long time"):
+        api_mod.fetch(basins, output_dir=tmp_path, quiet=True)
+
+    assert len(calls) == 2
+    by_basin = {c["basin"]: c for c in calls}
+    assert by_basin["Godavari"]["stations"] is None
+    assert by_basin["Godavari"]["basin_code"] == "5"
+    assert by_basin["Narmada"]["stations"] is None
+    assert by_basin["Narmada"]["basin_code"] == "4"
+    assert by_basin["Godavari"]["variable_flags"] == ["DISCHARG"]
+    assert by_basin["Narmada"]["variable_flags"] == ["DISCHARG"]
+
+
 def test_fetch_wris_legacy_scalar_attrs(monkeypatch, tmp_path):
     """fetch() still works with old-style scalar attrs (backward compat)."""
     import swift_app.api as api_mod
@@ -609,7 +675,7 @@ def test_fetch_cwc_missing_code_column_raises():
 # ============================================================
 
 
-def test_merge_with_mode_derives_input_dir(monkeypatch, tmp_path):
+def test_merge_only_with_mode_derives_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -621,12 +687,12 @@ def test_merge_with_mode_derives_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_merge_only", fake_run_merge_only)
 
-    api_mod.merge(mode="wris", output_dir=str(tmp_path))
+    api_mod.merge_only(mode="wris", output_dir=str(tmp_path))
 
     assert calls["input_dir"] == str(tmp_path)
 
 
-def test_merge_discovers_basins_from_input_dir(monkeypatch, tmp_path):
+def test_merge_only_discovers_basins_from_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -639,7 +705,7 @@ def test_merge_discovers_basins_from_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_merge_only", fake_run_merge_only)
 
-    api_mod.merge(
+    api_mod.merge_only(
         input_dir=str(tmp_path),
         variable=["solar"],
         output_dir=str(tmp_path / "merged"),
@@ -648,8 +714,8 @@ def test_merge_discovers_basins_from_input_dir(monkeypatch, tmp_path):
     assert calls == [str(tmp_path)]
 
 
-def test_merge_cwc_no_basin_warning(monkeypatch, tmp_path):
-    """merge(mode='cwc') runs once with no basin/datasets warning."""
+def test_merge_only_cwc_no_basin_warning(monkeypatch, tmp_path):
+    """merge_only(mode='cwc') runs once with no basin/datasets warning."""
     import swift_app.api as api_mod
 
     (tmp_path / "cwc" / "godavari" / "stations").mkdir(parents=True)
@@ -661,14 +727,14 @@ def test_merge_cwc_no_basin_warning(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_merge_only", fake_run_merge_only)
 
-    api_mod.merge(mode="cwc", input_dir=str(tmp_path), output_dir=str(tmp_path))
+    api_mod.merge_only(mode="cwc", input_dir=str(tmp_path), output_dir=str(tmp_path))
 
     assert len(calls) == 1
     assert calls[0][0] == str(tmp_path)
     assert calls[0][1] is True
 
 
-def test_plot_with_mode_derives_input_dir(monkeypatch, tmp_path):
+def test_plot_only_with_mode_derives_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -681,13 +747,13 @@ def test_plot_with_mode_derives_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
-    api_mod.plot(mode="wris", output_dir=str(tmp_path))
+    api_mod.plot_only(mode="wris", output_dir=str(tmp_path))
 
     assert calls["input_dir"] == str(tmp_path)
     assert calls["cwc"] is False
 
 
-def test_plot_discovers_basins_from_input_dir(monkeypatch, tmp_path):
+def test_plot_only_discovers_basins_from_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -700,7 +766,7 @@ def test_plot_discovers_basins_from_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
-    api_mod.plot(
+    api_mod.plot_only(
         input_dir=str(tmp_path),
         variable=["solar", "sediment"],
         output_dir=str(tmp_path / "plots"),
@@ -709,7 +775,7 @@ def test_plot_discovers_basins_from_input_dir(monkeypatch, tmp_path):
     assert calls == [str(tmp_path)]
 
 
-def test_plot_cwc_discovers_from_input_dir(monkeypatch, tmp_path):
+def test_plot_only_cwc_discovers_from_input_dir(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "cwc" / "godavari" / "stations").mkdir(parents=True)
@@ -721,12 +787,12 @@ def test_plot_cwc_discovers_from_input_dir(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
-    api_mod.plot(mode="cwc", input_dir=str(tmp_path), output_dir=str(tmp_path))
+    api_mod.plot_only(mode="cwc", input_dir=str(tmp_path), output_dir=str(tmp_path))
 
     assert calls == [str(tmp_path)]
 
 
-def test_plot_cwc_mode_sets_cwc_flag(monkeypatch, tmp_path):
+def test_plot_only_cwc_mode_sets_cwc_flag(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     calls = {}
@@ -736,19 +802,19 @@ def test_plot_cwc_mode_sets_cwc_flag(monkeypatch, tmp_path):
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
-    api_mod.plot(mode="cwc", output_dir=str(tmp_path))
+    api_mod.plot_only(mode="cwc", output_dir=str(tmp_path))
 
     assert calls["cwc"] is True
 
 
-def test_plot_input_dir_must_exist(tmp_path):
+def test_plot_only_input_dir_must_exist(tmp_path):
     import swift_app.api as api_mod
 
     missing = tmp_path / "nonexistent"
     assert not missing.exists()
 
     with pytest.raises(ValueError, match="input_dir does not exist"):
-        api_mod.plot(
+        api_mod.plot_only(
             input_dir=str(missing),
             output_dir=str(tmp_path / "plots"),
         )
@@ -780,3 +846,82 @@ def test_package_exposes_fetch():
 
     assert hasattr(swift_app, "fetch")
     assert callable(swift_app.fetch)
+
+
+def test_package_exposes_merge_only_and_plot_only():
+    import swift_app
+
+    assert hasattr(swift_app, "merge_only")
+    assert callable(swift_app.merge_only)
+    assert hasattr(swift_app, "plot_only")
+    assert callable(swift_app.plot_only)
+
+
+def test_package_does_not_expose_legacy_datasets_basins():
+    import swift_app
+
+    assert not hasattr(swift_app, "datasets")
+    assert not hasattr(swift_app, "basins")
+
+
+def test_wris_namespace_exposes_variables_and_basins():
+    import swift_app.api as api_mod
+
+    vars_df = api_mod.wris.variables()
+    assert len(vars_df) > 0
+    assert {"flag", "dataset_code", "folder", "canonical_name", "aliases"}.issubset(vars_df.columns)
+
+    basins_df = api_mod.wris.basins()
+    assert len(basins_df) > 0
+    assert {"id", "basin"}.issubset(basins_df.columns)
+
+
+def test_wris_basins_accepts_variable_and_expands_rows():
+    import swift_app.api as api_mod
+
+    out = api_mod.wris.basins(variable=["discharge", "solar"])
+
+    assert {"id", "basin", "variable"}.issubset(out.columns)
+    assert set(out["variable"].unique()) == {"discharge", "solar"}
+    assert out.attrs["source"] == "wris"
+    assert out.attrs["type"] == "basins"
+    assert out.attrs["variable"] == ["discharge", "solar"]
+
+
+def test_wris_basins_variable_validation_raises():
+    import swift_app.api as api_mod
+
+    with pytest.raises(ValueError, match="Unknown variable"):
+        api_mod.wris.basins(variable="not_a_real_variable")
+
+
+def test_cwc_namespace_exposes_basins(monkeypatch, tmp_path):
+    import swift_app.api as api_mod
+    cwc_mod = _get_cwc_engine_module()
+
+    csv = tmp_path / "meta.csv"
+    csv.write_text(
+        "code,name,basin\n"
+        "001-AAA,Alpha,Godavari\n"
+        "002-BBB,Beta,Krishna\n"
+        "003-CCC,Gamma,Godavari\n"
+    )
+    monkeypatch.setattr(cwc_mod, "PACKAGED_CSV", csv)
+    monkeypatch.setattr(cwc_mod, "CACHE_FILE", tmp_path / "nonexistent.csv")
+
+    out = api_mod.cwc_ns.basins()
+    assert {"basin", "station_count"}.issubset(out.columns)
+    counts = dict(zip(out["basin"], out["station_count"]))
+    assert counts["Godavari"] == 2
+    assert counts["Krishna"] == 1
+
+
+def test_package_help_matches_cli_help(capsys):
+    import swift_app
+    from swift_app.cli import build_parser
+
+    swift_app.help()
+    out = capsys.readouterr().out
+
+    expected = build_parser().format_help()
+    assert out == expected

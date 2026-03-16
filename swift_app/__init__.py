@@ -19,12 +19,33 @@ VERSION_FULL = f"{VERSION} — {__codename__}"
 from .api import (
     wris,
     cwc_ns as cwc,
+    help,
+    cli_help,
+    merge_only,
+    plot_only,
     merge,
     plot,
     fetch,
-    datasets,
-    basins,
     cite,
     coffee,
 )
 from .base_client import BaseHydrologyClient
+
+
+_LEGACY_API_REDIRECTS = {
+    "datasets": (
+        "`swift.datasets` has been removed. "
+        "Use `swift.wris.variables()` for WRIS variable definitions."
+    ),
+    "basins": (
+        "`swift.basins()` has been removed. "
+        "Use `swift.wris.basins()` for WRIS basins or `swift.cwc.basins()` for CWC basins."
+    ),
+}
+
+
+def __getattr__(name: str):
+    """Provide clear migration guidance for removed legacy API symbols."""
+    if name in _LEGACY_API_REDIRECTS:
+        raise AttributeError(_LEGACY_API_REDIRECTS[name])
+    raise AttributeError(f"module 'swift_app' has no attribute {name!r}")

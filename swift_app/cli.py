@@ -111,7 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Merge existing SWIFT station files into GeoPackages without "
-            "downloading new data (Python equivalent: swift.merge(...))"
+            "downloading new data (Python equivalent: swift.merge_only(...))"
         ),
     )
     parser.add_argument(
@@ -166,7 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Generate station time series plots after download "
-            "(Python equivalent for existing output: swift.plot(...))"
+            "(Python equivalent for existing output: swift.plot_only(...))"
         ),
     )
     output.add_argument(
@@ -192,7 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Generate plots from existing SWIFT output without downloading "
-            "(Python equivalent: swift.plot(..., cwc=...))"
+            "(Python equivalent: swift.plot_only(..., cwc=...))"
         ),
     )
 

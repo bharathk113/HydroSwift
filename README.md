@@ -84,16 +84,19 @@ swift_app.wris.download(
     quiet=True,
 )
 
-# Or use the unified entry point
-swift_app.fetch("wris", basin="Krishna", variable="discharge", merge=True, quiet=True)
-swift_app.fetch("cwc", station=["040-CDJAPR"])
+# Or use the unified entry point with station tables
+swift_stations = swift_app.wris.stations(basin="Krishna", variable="discharge")
+swift_app.fetch(swift_stations, merge=True, quiet=True)
+
+cwc_stations = swift_app.cwc.stations(station="040-CDJAPR")
+swift_app.fetch(cwc_stations)
 
 # Supported variable names: discharge, water_level, rainfall, temperature,
 # humidity, solar_radiation, sediment, groundwater_level
 ```
 
-> Note: `dataset_flags=["q", "rf", ...]` is still accepted for backwards compatibility,
-> but `datasets=["discharge", "rainfall", ...]` is preferred for readability.
+> Note: legacy `swift.datasets` and `swift.basins()` are removed.
+> Use `swift_app.wris.variables()`, `swift_app.wris.basins()`, and `swift_app.cwc.basins()`.
 
 ------------------------------------------------------------
 
