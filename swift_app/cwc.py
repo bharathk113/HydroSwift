@@ -771,40 +771,75 @@ def run_cwc_download(args):
     )
 
     # ---------------------------------------------------------
-    # Station filter
+    # Station selection filters (fetch()-like behavior)
     # ---------------------------------------------------------
 
-    if args.cwc_station:
-        stations = stations[stations["code"].isin(args.cwc_station)]
+    # Normalise explicit station filters (case-insensitive).
+    station_filters = getattr(args, "cwc_station", None)
+    if station_filters is None:
+        station_filters = []
+    elif isinstance(station_filters, str):
+        station_filters = [station_filters]
+    else:
+        station_filters = list(station_filters)
+    station_filters = [str(s).strip() for s in station_filters if str(s).strip()]
 
-        if stations.empty:
-            logger.log("ERROR", "No matching CWC stations found")
-            raise SystemExit("No matching CWC stations found")
-
-    # Optional basin filter (case-insensitive substring matching) to
-    # mirror swift.cwc.stations(..., basin=...) behavior. This acts as
-    # a defensive filter in case only basin names are provided upstream.
+    # Resolve basin filters to canonical station codes using metadata,
+    # mirroring the Python API/fetch path.
     basin_filters = getattr(args, "cwc_basin_filter", None)
+    if basin_filters is None:
+        basin_filters = []
+    elif isinstance(basin_filters, str):
+        basin_filters = [basin_filters]
+    else:
+        basin_filters = list(basin_filters)
+    basin_filters = [str(b).strip() for b in basin_filters if str(b).strip()]
+
     if basin_filters:
-        if isinstance(basin_filters, str):
-            basin_filters = [basin_filters]
-        basin_filters = [str(b).strip() for b in basin_filters if str(b).strip()]
-        if basin_filters and "basin" in stations.columns:
-            basin_mask = pd.Series(False, index=stations.index)
-            basin_series = stations["basin"].astype(str)
-            for b in basin_filters:
-                basin_mask |= basin_series.str.lower().str.contains(b.lower(), na=False)
-            stations = stations[basin_mask]
-            if stations.empty:
-                logger.log(
-                    "ERROR",
-                    "No matching CWC stations found for basin filter: "
-                    + ", ".join(basin_filters),
-                )
-                raise SystemExit(
-                    "No matching CWC stations found for basin filter: "
-                    + ", ".join(basin_filters)
-                )
+        basin_meta = get_cwc_station_metadata(
+            basin=basin_filters,
+            refresh=getattr(args, "cwc_refresh", False),
+        )
+        basin_codes_norm = {
+            str(c).strip().lower()
+            for c in basin_meta["code"].dropna().tolist()
+            if str(c).strip()
+        }
+        if not basin_codes_norm:
+            logger.log(
+                "ERROR",
+                "No matching CWC stations found for basin filter: "
+                + ", ".join(basin_filters),
+            )
+            raise SystemExit(
+                "No matching CWC stations found for basin filter: "
+                + ", ".join(basin_filters)
+            )
+        stations = stations[
+            stations["code"].astype(str).str.strip().str.lower().isin(basin_codes_norm)
+        ]
+
+    if station_filters:
+        requested_codes_norm = {s.lower() for s in station_filters}
+        stations = stations[
+            stations["code"].astype(str).str.strip().str.lower().isin(requested_codes_norm)
+        ]
+
+    if stations.empty:
+        if basin_filters and station_filters:
+            msg = (
+                "No overlap between requested station code(s) and basin filter. "
+                f"Basin filter: {', '.join(basin_filters)}"
+            )
+        elif basin_filters:
+            msg = (
+                "No matching CWC stations found for basin filter: "
+                + ", ".join(basin_filters)
+            )
+        else:
+            msg = "No matching CWC stations found"
+        logger.log("ERROR", msg)
+        raise SystemExit(msg)
 
     n_stations = len(stations)
 
@@ -823,7 +858,7 @@ def run_cwc_download(args):
         print(f"{Console.ITALIC}Note: The CWC servers stream full historical datasets at slow speeds (~100 KB/s).{Console.RESET}")
         print(f"{Console.ITALIC}A single station may take 1-2 minutes to appear on the progress bar. Please do not cancel the process.{Console.RESET}\n")
 
-    logger.log("INFO", f"Discovered {n_stations} CWC stations natively")
+    logger.log("INFO", f"Selected {n_stations} CWC stations after filters")
 
     # ---------------------------------------------------------
     # Output folder: basin-aware when possible
