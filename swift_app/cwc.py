@@ -36,6 +36,7 @@ CWC_API = "https://ffs.india-water.gov.in/iam/api/new-entry-data/specification/s
 CACHE_DIR = Path.home() / ".swift_cache"
 CACHE_FILE = CACHE_DIR / "cwc_meta.csv"
 PACKAGED_CSV = Path(__file__).parent / "cwc_meta.csv"
+NAME_CODE_CSV = Path(__file__).parent / "name-code.csv"
 
 CACHE_TTL = 86400  # 24 hours
 
@@ -59,6 +60,124 @@ def _write_cache(df):
         df.to_csv(CACHE_FILE, index=False)
     except Exception:
         pass
+
+
+def _fetch_station_detail(code, retries=3):
+    """Fetch /layer-station/{code} with basic retry/backoff."""
+    import time
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+    delays = [2, 5, 10]
+    for attempt in range(retries):
+        try:
+            resp = session.get(
+                f"{LAYER_STATION_BASE}/{code}",
+                headers=headers,
+                timeout=60,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict) and data:
+                    return data
+            if attempt < retries - 1:
+                time.sleep(delays[min(attempt, len(delays) - 1)])
+        except Exception:
+            if attempt < retries - 1:
+                time.sleep(delays[min(attempt, len(delays) - 1)])
+    return None
+
+
+def repopulate_cwc_metadata_from_name_code(write_packaged=False):
+    """Reconcile `name-code.csv` with current CWC metadata.
+
+    This helper checks codes present in ``name-code.csv`` but missing in the
+    packaged metadata and tries to fetch per-station metadata from the CWC
+    ``/layer-station/{code}`` endpoint. Successful lookups are appended to the
+    metadata table.
+
+    Parameters
+    ----------
+    write_packaged : bool, default False
+        If True, overwrite packaged ``cwc_meta.csv`` with the reconciled table.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, pd.DataFrame]
+        ``(merged_metadata, appended_rows)``
+    """
+    current = load_station_table(refresh=False).copy()
+
+    if not NAME_CODE_CSV.exists():
+        raise RuntimeError("name-code.csv not found")
+    name_code = pd.read_csv(NAME_CODE_CSV)
+    name_code.columns = [c.lower().strip() for c in name_code.columns]
+    if "code" not in name_code.columns:
+        raise RuntimeError("name-code.csv must include a 'code' column")
+
+    existing_codes = {
+        str(c).strip().lower()
+        for c in current["code"].dropna().tolist()
+        if str(c).strip()
+    }
+    candidates = [
+        str(c).strip()
+        for c in name_code["code"].dropna().tolist()
+        if str(c).strip() and str(c).strip().lower() not in existing_codes
+    ]
+
+    if not candidates:
+        return current.sort_values("code").reset_index(drop=True), pd.DataFrame(columns=current.columns)
+
+    (
+        lr_name,
+        resolve_basin,
+        resolve_state,
+        resolve_district,
+        resolve_division,
+        ff_map,
+    ) = _fetch_all_lookups()
+
+    rows = []
+    for code in candidates:
+        detail = _fetch_station_detail(code)
+        if not detail:
+            continue
+
+        lr_id = detail.get("streamLocalriverId")
+        tahsil_id = detail.get("tahsilId")
+        subdiv_id = detail.get("subdivisionalOfficeId")
+        ff = ff_map.get(code, {})
+
+        rows.append({
+            "code": code,
+            "name": detail.get("name"),
+            "river": lr_name.get(lr_id) if lr_id else None,
+            "basin": resolve_basin(lr_id) if lr_id else None,
+            "state": resolve_state(tahsil_id) if tahsil_id else None,
+            "district": resolve_district(tahsil_id) if tahsil_id else None,
+            "division": resolve_division(subdiv_id) if subdiv_id else None,
+            "lat": detail.get("lat"),
+            "lon": detail.get("lon"),
+            "rl_zero": detail.get("reducedLevelOfZeroGauge"),
+            "warning_level": ff.get("warningLevel"),
+            "danger_level": ff.get("dangerLevel"),
+            "hfl": ff.get("highestFlowLevel"),
+            "hfl_date": ff.get("highestFlowLevelDate"),
+        })
+
+    appended = pd.DataFrame(rows)
+    if appended.empty:
+        merged = current.copy()
+    else:
+        merged = pd.concat([current, appended], ignore_index=True)
+        merged = merged.drop_duplicates(subset="code", keep="first")
+
+    merged = merged.sort_values("code").reset_index(drop=True)
+
+    if write_packaged:
+        merged.to_csv(PACKAGED_CSV, index=False)
+
+    return merged, appended
 
 
 # ---------------------------------------------------------
@@ -787,6 +906,10 @@ def run_cwc_download(args):
     # Resolve basin filters to canonical station codes using metadata,
     # mirroring the Python API/fetch path.
     basin_filters = getattr(args, "cwc_basin_filter", None)
+    # Backward-compatible fallback: treat direct `basin=` inputs as CWC
+    # basin filters when explicit cwc_basin_filter is not provided.
+    if not basin_filters:
+        basin_filters = getattr(args, "basin", None)
     if basin_filters is None:
         basin_filters = []
     elif isinstance(basin_filters, str):
@@ -1064,4 +1187,3 @@ def run_cwc_download(args):
         print("-------------------------------------------------------------")
 
     return 0
-

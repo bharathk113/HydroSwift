@@ -23,6 +23,7 @@ import swift_app
 | **swift_app.wris.variables**() | List supported WRIS variables, flags, and aliases |
 | **swift_app.wris.basins**() | List WRIS basin id/name table |
 | **swift_app.cwc.basins**(refresh=False) | List CWC basins with station counts from metadata |
+| **swift_app.cwc.reconcile_metadata**(write=False) | Probe missing codes from `name-code.csv` against CWC API and return reconciled metadata |
 | **swift_app.fetch**(stations_df, ...) | Download data for stations listed in a WRIS/CWC stations table |
 | **swift_app.merge_only**(input_dir=..., mode=..., variable=..., ...) | Merge existing station files into GeoPackages (preferred) |
 | **swift_app.plot_only**(input_dir=..., mode=..., variable=..., cwc=..., ...) | Generate hydrograph plots from existing output (preferred) |
