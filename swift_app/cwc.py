@@ -1110,7 +1110,9 @@ def run_cwc_download(args):
         # Basin-aware, time-period-aware GeoPackage name (like WRIS).
         # Format: cwc_waterlevel_<basin>_<start_date>_<end_date>.gpkg
         basin_slug = ""
-        if getattr(args, "basin", None):
+        if getattr(args, "gpkg_group", None):
+            basin_slug = str(args.gpkg_group).strip().lower().replace(" ", "_")
+        elif getattr(args, "basin", None):
             basin_slug = str(args.basin).strip().lower().replace(" ", "_")
         elif not stations.empty and "basin" in stations.columns:
             unique_basins = {
@@ -1123,14 +1125,10 @@ def run_cwc_download(args):
         start_slug = (str(args.start_date)[:10] if args.start_date else "1950-01-01")
         end_slug = (str(args.end_date)[:10] if args.end_date else _time.strftime("%Y-%m-%d"))
 
-        name_parts = ["cwc_waterlevel"]
-        
-        # If exactly one station was explicitly requested, use that for the name
-        station_filters = getattr(args, "cwc_station", None)
-        if isinstance(station_filters, list) and len(station_filters) == 1:
-             name_parts.append(str(station_filters[0]).strip().lower())
-        elif basin_slug:
-            name_parts.append(basin_slug)
+        if not basin_slug:
+            basin_slug = "all_stations"
+
+        name_parts = ["cwc_waterlevel", basin_slug]
             
         name_parts.extend([start_slug, end_slug])
         gpkg_name = "_".join(name_parts) + ".gpkg"

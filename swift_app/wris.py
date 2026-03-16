@@ -279,6 +279,24 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
 
     cache_updated = False
 
+    def _station_slug(codes):
+        clean = []
+        seen = set()
+        for code in codes or []:
+            norm = str(code).strip().lower()
+            if not norm or norm in seen:
+                continue
+            seen.add(norm)
+            clean.append(norm)
+        if not clean:
+            return ""
+        if len(clean) == 1:
+            return clean[0]
+        head = "_".join(clean[:3])
+        if len(clean) > 3:
+            return f"stations_{head}_plus{len(clean) - 3}"
+        return f"stations_{head}"
+
     # ---------------------------------------------------------
     # Estimate total runtime across all datasets
     # ---------------------------------------------------------
@@ -464,11 +482,19 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
 
             start_slug = (args.start_date or "1950-01-01")[:10]
             end_slug = (args.end_date or "").strip()[:10] or time.strftime("%Y-%m-%d")
-            
-            if station_filter and len(station_filter) == 1:
-                gpkg_basename = str(list(station_filter)[0]).strip().lower()
+
+            name_by = str(getattr(args, "name_by", "") or "").strip().lower()
+            station_name_slug = _station_slug(station_filter)
+            basin_name_slug = str(args.basin).strip().lower()
+
+            if name_by == "station":
+                gpkg_basename = station_name_slug or basin_name_slug
+            elif name_by == "basin":
+                gpkg_basename = basin_name_slug or station_name_slug
+            elif station_filter and len(station_filter) == 1:
+                gpkg_basename = station_name_slug
             else:
-                gpkg_basename = args.basin.lower()
+                gpkg_basename = basin_name_slug
 
             gpkg_path = os.path.join(
                 base_output,

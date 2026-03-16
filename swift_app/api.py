@@ -267,6 +267,8 @@ def _build_args(**kwargs):
     args.cwc_basin_filter = kwargs.get("cwc_basin_filter")
     args.stations = kwargs.get("stations")
     args.cwc_refresh = kwargs.get("cwc_refresh", False)
+    args.name_by = kwargs.get("name_by")
+    args.gpkg_group = kwargs.get("gpkg_group")
     dataset_keys = ["q", "wl", "atm", "rf", "temp", "rh", "solar", "sed", "gwl"]
     for key in dataset_keys:
         setattr(args, key, False)
@@ -308,6 +310,7 @@ def get_wris_data(
     plot=False,
     delay=0.25,
     quiet=False,
+    name_by=None,
 ):
     """
     Download WRIS time-series data to files.
@@ -368,6 +371,7 @@ def get_wris_data(
                 plot=plot,
                 delay=delay,
                 quiet=quiet,
+                name_by=name_by,
             )
             if res is None or _pd is None:
                 continue
@@ -410,6 +414,7 @@ def get_wris_data(
         quiet=quiet,
         dataset_flags=dataset_flags,
         stations=stations,
+        name_by=name_by,
     )
 
     client = WrisClient(delay=delay)
@@ -519,6 +524,8 @@ def get_cwc_data(
     plot=False,
     quiet=False,
     refresh=False,
+    name_by=None,
+    gpkg_group=None,
 ):
     """
     Download CWC water-level time-series data to files.
@@ -639,6 +646,8 @@ def get_cwc_data(
         output_dir=str(Path(output_dir)),
         format=format,
         quiet=quiet,
+        name_by=name_by,
+        gpkg_group=gpkg_group,
     )
 
     run_cwc_download(args)
@@ -1188,6 +1197,8 @@ class _CwcNamespace:
         plot=False,
         quiet=False,
         refresh=False,
+        _name_by=None,
+        _gpkg_group=None,
     ):
         """
         Download CWC water-level time-series data.
@@ -1228,6 +1239,23 @@ class _CwcNamespace:
                 refresh=refresh,
             )
 
+        # Also allow basin tables via keyword input: swift.cwc.download(basin=table).
+        if isinstance(basin, pd.DataFrame):
+            if "basin" not in basin.columns:
+                raise ValueError("CWC basin table input must include a 'basin' column")
+            return fetch(
+                basin,
+                output_dir=output_dir,
+                start_date=start_date,
+                end_date=end_date,
+                format=format,
+                overwrite=overwrite,
+                merge=merge,
+                plot=plot,
+                quiet=quiet,
+                refresh=refresh,
+            )
+
         return get_cwc_data(
             station=station,
             basin=basin,
@@ -1240,6 +1268,8 @@ class _CwcNamespace:
             plot=plot,
             quiet=quiet,
             refresh=refresh,
+            name_by=_name_by,
+            gpkg_group=_gpkg_group,
         )
 
     @staticmethod
@@ -1564,6 +1594,7 @@ def fetch(
                     plot=plot,
                     delay=delay,
                     quiet=quiet,
+                    name_by="station",
                 )
                 if res is not None and _pd is not None:
                     if hasattr(res, "assign"):
@@ -1607,11 +1638,13 @@ def fetch(
             plot=plot,
             delay=delay,
             quiet=quiet,
+            name_by="station",
         )
 
     if source == "cwc":
         has_code_col = "code" in stations.columns
         has_basin_col = "basin" in stations.columns
+        has_state_col = "state" in stations.columns
 
         # Basin-level CWC fetch from swift.cwc.basins(): table includes
         # basin names and station counts, but no explicit station codes.
@@ -1668,6 +1701,7 @@ def fetch(
                     plot=plot,
                     quiet=quiet,
                     refresh=refresh,
+                    _name_by="basin",
                 )
                 if res is not None and _pd is not None and hasattr(res, "assign"):
                     frames.append(res.assign(basin=str(grp_basin)))
@@ -1687,16 +1721,34 @@ def fetch(
                     return "unknown"
                 return str(val).strip()
 
-            groups = stations.groupby(
-                stations["basin"].map(_basin_slug),
-                sort=True,
-            )
+            def _state_slug(val):
+                if pd.isna(val) or val is None or str(val).strip() == "":
+                    return "unknown"
+                return str(val).strip()
+
+            if has_state_col:
+                groups = stations.groupby(
+                    [
+                        stations["basin"].map(_basin_slug),
+                        stations["state"].map(_state_slug),
+                    ],
+                    sort=True,
+                )
+            else:
+                groups = stations.groupby(
+                    stations["basin"].map(_basin_slug),
+                    sort=True,
+                )
             try:
                 import pandas as _pd  # type: ignore[import]
             except Exception:
                 _pd = None
             frames = []
-            for grp_basin, grp_df in groups:
+            for group_key, grp_df in groups:
+                if has_state_col:
+                    grp_basin, grp_state = group_key
+                else:
+                    grp_basin, grp_state = group_key, None
                 codes = sorted(
                     {
                         str(c).strip()
@@ -1706,9 +1758,12 @@ def fetch(
                 )
                 if not codes:
                     continue
+                gpkg_group = str(grp_basin)
+                if has_state_col and grp_state and str(grp_state).strip().lower() != "unknown":
+                    gpkg_group = f"{grp_basin}_{grp_state}"
                 res = cwc_ns.download(
                     station=codes,
-                    basin=grp_basin if grp_basin != "unknown" else None,
+                    basin=None,
                     start_date=start_date,
                     end_date=end_date,
                     output_dir=output_dir,
@@ -1718,9 +1773,14 @@ def fetch(
                     plot=plot,
                     quiet=quiet,
                     refresh=refresh,
+                    _name_by="basin",
+                    _gpkg_group=gpkg_group,
                 )
                 if res is not None and _pd is not None and hasattr(res, "assign"):
-                    frames.append(res.assign(basin=str(grp_basin)))
+                    if has_state_col:
+                        frames.append(res.assign(basin=str(grp_basin), state=str(grp_state)))
+                    else:
+                        frames.append(res.assign(basin=str(grp_basin)))
             if not frames or _pd is None:
                 return None
             return _pd.concat(frames, ignore_index=True)
@@ -1745,6 +1805,7 @@ def fetch(
             plot=plot,
             quiet=quiet,
             refresh=refresh,
+            _name_by="basin",
         )
 
     raise ValueError(f"Unknown stations source: {source!r}.")
