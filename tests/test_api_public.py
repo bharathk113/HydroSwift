@@ -274,6 +274,108 @@ def test_wris_namespace_download_supports_multiple_basins(monkeypatch, tmp_path)
     assert calls == ["Krishna", "Godavari"]
 
 
+def test_wris_namespace_download_accepts_station_table(monkeypatch, tmp_path):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_fetch(stations, **kwargs):
+        calls["cols"] = list(stations.columns)
+        calls["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(api_mod, "fetch", fake_fetch)
+
+    stations = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "station_code": ["ST001", "ST002"],
+                "basin": ["Godavari", "Narmada"],
+                "variable": ["solar", "sediment"],
+            }
+        )
+    )
+    stations.attrs["source"] = "wris"
+
+    api_mod.wris.download(
+        stations,
+        start_date="2024-01-01",
+        end_date="2024-01-07",
+        output_dir=tmp_path,
+        format="xlsx",
+        overwrite=False,
+        merge=False,
+        plot=True,
+        quiet=True,
+    )
+
+    assert "station_code" in calls["cols"]
+    assert calls["kwargs"]["format"] == "xlsx"
+    assert calls["kwargs"]["plot"] is True
+
+
+def test_wris_namespace_download_accepts_basin_table(monkeypatch, tmp_path):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_fetch(stations, **kwargs):
+        calls["cols"] = list(stations.columns)
+        calls["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(api_mod, "fetch", fake_fetch)
+
+    basins = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "basin": ["Godavari", "Narmada"],
+                "variable": ["solar", "sediment"],
+            }
+        )
+    )
+    basins.attrs["source"] = "wris"
+
+    api_mod.wris.download(
+        basins,
+        start_date="2024-01-01",
+        end_date="2024-01-07",
+        output_dir=tmp_path,
+        format="xlsx",
+        overwrite=False,
+        merge=False,
+        plot=True,
+        quiet=True,
+    )
+
+    assert "basin" in calls["cols"]
+    assert calls["kwargs"]["start_date"] == "2024-01-01"
+
+
+def test_cwc_namespace_download_accepts_station_table_input(monkeypatch):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_run_cwc_download(args):
+        calls["stations"] = args.cwc_station
+
+    monkeypatch.setattr(api_mod, "run_cwc_download", fake_run_cwc_download)
+
+    stations = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "code": ["040-CDJAPR", "032-LGDHYD"],
+                "name": ["A", "B"],
+            }
+        )
+    )
+
+    api_mod.cwc_ns.download(station=stations, quiet=True)
+
+    assert calls["stations"] == ["040-CDJAPR", "032-LGDHYD"]
+
+
 def test_cwc_namespace_download_dispatches(monkeypatch):
     """swift.cwc.download() should delegate to the CWC engine."""
     import swift_app.api as api_mod
@@ -302,6 +404,57 @@ def test_cwc_namespace_download_basin_filter(monkeypatch):
     api_mod.cwc_ns.download(basin=["Krishna", "Godavari"], quiet=True)
     assert calls["cwc"] is True
     assert calls["basin_filter"] == ["Krishna", "Godavari"]
+
+
+def test_cwc_namespace_download_accepts_basin_table_input(monkeypatch):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_run_cwc_download(args):
+        calls["basin_filter"] = args.cwc_basin_filter
+
+    monkeypatch.setattr(api_mod, "run_cwc_download", fake_run_cwc_download)
+
+    basin_table = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "basin": ["Krishna", "Godavari", "Mahanadi"],
+                "station_count": [10, 20, 30],
+            }
+        )
+    )
+
+    api_mod.cwc_ns.download(basin=basin_table.iloc[0:2], quiet=True)
+
+    assert calls["basin_filter"] == ["Krishna", "Godavari"]
+
+
+def test_cwc_namespace_download_basin_table_requires_basin_column(monkeypatch):
+    import swift_app.api as api_mod
+
+    with pytest.raises(ValueError, match="must include a 'basin' column"):
+        api_mod.cwc_ns.download(
+            basin=pd.DataFrame({"name": ["Krishna"]}),
+            quiet=True,
+        )
+
+
+def test_cwc_namespace_reconcile_metadata_exposes_appended_count(monkeypatch):
+    import swift_app.api as api_mod
+
+    merged = pd.DataFrame([{"code": "001-AAA", "name": "A"}])
+    appended = pd.DataFrame([{"code": "001-AAA", "name": "A"}])
+
+    monkeypatch.setattr(
+        api_mod,
+        "repopulate_cwc_metadata_from_name_code",
+        lambda write_packaged=False: (merged, appended),
+    )
+
+    out = api_mod.cwc_ns.reconcile_metadata(write=False)
+    assert len(out) == 1
+    assert out.attrs["appended_count"] == 1
 
 
 def test_wris_namespace_stations(monkeypatch):

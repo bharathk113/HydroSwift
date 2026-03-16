@@ -31,7 +31,11 @@ from .cli import DATASETS, WRIS_BASINS
 from .wris import run_wris_download, build_basin_structure, discover_stations
 from .merge import run_merge_only
 from .plot import run_plot_only
-from .cwc import run_cwc_download, get_cwc_station_metadata
+from .cwc import (
+    run_cwc_download,
+    get_cwc_station_metadata,
+    repopulate_cwc_metadata_from_name_code,
+)
 
 
 # ---------------------------------------------------------
@@ -159,6 +163,21 @@ def _normalize_datasets_input(datasets):
 def _normalize_cwc_station_input(cwc_station):
     if cwc_station is None:
         return None
+    if isinstance(cwc_station, pd.DataFrame):
+        if "code" in cwc_station.columns:
+            vals = cwc_station["code"].tolist()
+        elif "station_code" in cwc_station.columns:
+            vals = cwc_station["station_code"].tolist()
+        else:
+            raise ValueError(
+                "Table-like station input must include a 'code' column "
+                "(or 'station_code')."
+            )
+        out = [str(v).strip() for v in vals if str(v).strip()]
+        return out or None
+    if isinstance(cwc_station, pd.Series):
+        out = [str(v).strip() for v in cwc_station.tolist() if str(v).strip()]
+        return out or None
     if isinstance(cwc_station, (str, int)):
         return [str(cwc_station)]
     return [str(x) for x in cwc_station]
@@ -171,6 +190,43 @@ def _normalize_wris_station_input(station):
     if isinstance(station, (str, int)):
         return [str(station)]
     return [str(x) for x in station]
+
+
+def _normalize_cwc_basin_input(basin):
+    """Normalise CWC basin filters from scalar/list/table-like inputs.
+
+    Accepts:
+    - str / scalar basin names
+    - list/tuple/set of basin names
+    - pandas Series of basin names
+    - pandas DataFrame (or SwiftTable) containing a ``basin`` column
+    """
+    if basin is None:
+        return []
+
+    # Table-like input (e.g., swift.cwc.basins()[0:3]).
+    if isinstance(basin, pd.DataFrame):
+        if "basin" not in basin.columns:
+            raise ValueError(
+                "Table-like basin input must include a 'basin' column. "
+                "Use swift.cwc.basins() or pass basin names directly."
+            )
+        vals = basin["basin"].tolist()
+        return [str(b).strip() for b in vals if str(b).strip()]
+
+    # Series input (e.g., df['basin']).
+    if isinstance(basin, pd.Series):
+        vals = basin.tolist()
+        return [str(b).strip() for b in vals if str(b).strip()]
+
+    if isinstance(basin, str):
+        return [basin.strip()] if basin.strip() else []
+
+    if isinstance(basin, (list, tuple, set)):
+        return [str(b).strip() for b in basin if str(b).strip()]
+
+    one = str(basin).strip()
+    return [one] if one else []
 
 
 def _normalize_dataset_flags(datasets):
@@ -534,15 +590,7 @@ def get_cwc_data(
     # Resolve basin filters to station codes so direct namespace calls like
     # swift.cwc.download(basin=["Krishna", "Godavari"], ...) behave like
     # fetch() and WRIS downloads.
-    basins = []
-    if basin is not None:
-        if isinstance(basin, str):
-            basins = [basin.strip()] if basin.strip() else []
-        elif isinstance(basin, (list, tuple, set)):
-            basins = [str(b).strip() for b in basin if str(b).strip()]
-        else:
-            one = str(basin).strip()
-            basins = [one] if one else []
+    basins = _normalize_cwc_basin_input(basin)
 
     if basins:
         basin_meta = cwc_stations(basin=basins, refresh=refresh)
@@ -572,9 +620,7 @@ def get_cwc_data(
 
     # Preserve existing folder convention for single-basin inputs while still
     # supporting multi-basin filtering in one call.
-    basin_arg = basin
-    if isinstance(basin, (list, tuple, set)):
-        basin_arg = basin[0] if len(basin) == 1 else None
+    basin_arg = basins[0] if len(basins) == 1 else None
 
     # Always enable on-disk GeoPackage merging; the *merge* flag controls
     # only whether a concatenated GeoDataFrame is returned from this
@@ -912,7 +958,7 @@ class _WrisNamespace:
     @staticmethod
     def download(
         basin,
-        variable,
+        variable=None,
         *,
         station=None,
         start_date="1950-01-01",
@@ -944,17 +990,32 @@ class _WrisNamespace:
         delay : float
             Seconds between API requests.
         """
-        if station is not None:
+        # Table-compliant path: allow direct hand-off from wris.stations()
+        # or wris.basins(variable=...) similarly to swift.fetch(...).
+        if isinstance(basin, pd.DataFrame):
+            return fetch(
+                basin,
+                output_dir=output_dir,
+                start_date=start_date,
+                end_date=end_date,
+                format=format,
+                overwrite=overwrite,
+                merge=merge,
+                plot=plot,
+                quiet=quiet,
+                delay=delay,
+            )
+
+        if variable is None:
             raise ValueError(
-                "swift.wris.download() does not support station-level filtering. "
-                "Use basin + variable combinations (or call swift.fetch(...) with "
-                "a WRIS station table)."
+                "variable is required for swift.wris.download() when basin is "
+                "provided as a name/id."
             )
 
         return get_wris_data(
             var=variable,
             basin=basin,
-            station=None,
+            station=station,
             start_date=start_date,
             end_date=end_date,
             output_dir=output_dir,
@@ -1223,6 +1284,29 @@ class _CwcNamespace:
         out.attrs["fetch_source"] = "cwc"
         out.attrs["type"] = "basins"
         out.attrs["basin"] = summary["basin"].tolist()
+        return out
+
+    @staticmethod
+    def reconcile_metadata(write=False):
+        """Reconcile `name-code.csv` codes into CWC metadata via live API lookups.
+
+        Parameters
+        ----------
+        write : bool, default False
+            If True, overwrite packaged `cwc_meta.csv` with reconciled output.
+
+        Returns
+        -------
+        SwiftTable
+            Reconciled metadata table. Also includes attrs:
+            - ``appended_count``: number of rows discovered from name-code.csv
+        """
+        merged, appended = repopulate_cwc_metadata_from_name_code(write_packaged=write)
+        out = SwiftTable(merged.copy())
+        out.attrs["source"] = "cwc"
+        out.attrs["fetch_source"] = "cwc"
+        out.attrs["type"] = "metadata"
+        out.attrs["appended_count"] = int(len(appended))
         return out
 
 
