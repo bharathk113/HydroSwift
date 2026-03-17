@@ -1,6 +1,7 @@
 import sys
 import pytest
 import pandas as pd
+from types import SimpleNamespace
 
 from swift_app.api import _normalize_dataset_flags
 
@@ -690,6 +691,57 @@ def test_fetch_dispatches_multi_basin_variable_groups(monkeypatch, tmp_path):
             assert sorted(c["stations"]) == ["S3", "S4"]
 
 
+def test_get_wris_data_merge_reads_lowercase_basin_gpkg(monkeypatch, tmp_path):
+    """merge=True should return data when downloader writes lowercase basin filenames."""
+    import swift_app.api as api_mod
+
+    class DummyClient:
+        def __init__(self, delay=0.25):
+            self.delay = delay
+
+        def check_api(self):
+            return True
+
+        def get_basin_code(self, basin):
+            return "5"
+
+    def fake_run_wris_download(args, selected, client, basin_code):
+        basin_dir = tmp_path / "wris" / "cauvery"
+        basin_dir.mkdir(parents=True, exist_ok=True)
+        gpkg_path = basin_dir / "cauvery_sediment_2024-04-01_2025-05-07.gpkg"
+        gpkg_path.write_text("placeholder")
+        return [{"dataset": "sediment", "downloaded": 1}]
+
+    fake_gpd = SimpleNamespace(
+        read_file=lambda _p: pd.DataFrame(
+            {
+                "station_code": ["S1"],
+                "time": ["2024-04-02"],
+                "sediment": [1.23],
+            }
+        )
+    )
+
+    monkeypatch.setattr(api_mod, "WrisClient", DummyClient)
+    monkeypatch.setattr(api_mod, "run_wris_download", fake_run_wris_download)
+    monkeypatch.setitem(sys.modules, "geopandas", fake_gpd)
+
+    out = api_mod.get_wris_data(
+        var="sediment",
+        basin="Cauvery",
+        start_date="2024-04-01",
+        end_date="2025-05-07",
+        output_dir=tmp_path,
+        merge=True,
+        quiet=True,
+    )
+
+    assert out is not None
+    assert len(out) == 1
+    assert out.loc[0, "basin"] == "Cauvery"
+    assert out.loc[0, "variable"] == "sediment"
+
+
 def test_fetch_wris_basin_table_dispatches_all_station_downloads(monkeypatch, tmp_path):
     """fetch() should accept wris.basins(variable=...) style tables."""
     import swift_app.api as api_mod
@@ -1055,12 +1107,13 @@ def test_cwc_namespace_exposes_basins(monkeypatch, tmp_path):
     assert counts["Krishna"] == 1
 
 
-def test_package_help_matches_cli_help(capsys):
+def test_package_help_prints_python_api_menu(capsys):
     import swift_app
-    from swift_app.cli import build_parser
 
     swift_app.help()
     out = capsys.readouterr().out
 
-    expected = build_parser().format_help()
-    assert out == expected
+    assert "SWIFT Python API help" in out
+    assert "swift.wris.download" in out
+    assert "swift.fetch(table, ...)" in out
+    assert "swift.cli_help()" in out

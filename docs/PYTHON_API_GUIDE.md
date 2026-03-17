@@ -168,7 +168,8 @@ Optional quality controls:
 
 ## 6) Utilities
 
-- `swift.help()` / `swift.cli_help()` → print CLI help in Python context.
+- `swift.help()` → print Python API help in Python context.
+- `swift.cli_help()` → print CLI help (equivalent to `swift -h`) in Python context.
 - `swift.cite()` → print citation text.
 - `swift.coffee()` → utility banner/easter egg.
 

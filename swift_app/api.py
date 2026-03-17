@@ -36,8 +36,37 @@ from .cwc import (
 
 
 # ---------------------------------------------------------
-# CLI help bridge for Python API
+# Python help and CLI help bridge
 # ---------------------------------------------------------
+
+PYTHON_HELP_TEXT = """SWIFT Python API help
+
+Quick start:
+    import swift_app as swift
+
+Core namespaces:
+    swift.wris.variables()                 # WRIS variable catalog
+    swift.wris.basins(variable=None)       # WRIS basins table
+    swift.wris.stations(basin, variable)   # WRIS station discovery table
+    swift.wris.download(...)               # WRIS download (explicit args)
+
+    swift.cwc.basins()                     # CWC basin summary
+    swift.cwc.stations(...)                # CWC station metadata table
+    swift.cwc.download(...)                # CWC download (explicit args)
+
+Unified table workflow:
+    swift.fetch(table, ...)                # Download from WRIS/CWC station/basin tables
+
+Post-processing helpers:
+    swift.merge_only(...)
+    swift.plot_only(...)
+
+Utilities:
+    swift.help()                           # this Python API help menu
+    swift.cli_help()                       # CLI help (equivalent to `swift -h`)
+    swift.cite()
+    swift.coffee()
+"""
 
 def cli_help():
     """Print the command-line help text (equivalent to ``swift -h``)."""
@@ -49,12 +78,12 @@ def cli_help():
 
 
 def help():
-    """Print command-line help text (equivalent to ``swift -h``).
+    """Print Python API help text.
 
-    This mirrors historical package behavior and keeps ``swift.help()``
-    aligned with CLI parser output used by tests and documentation checks.
+    Use :func:`cli_help` when you want the CLI parser menu from Python.
     """
-    return cli_help()
+    print(PYTHON_HELP_TEXT)
+    return None
 
 
 # ---------------------------------------------------------
@@ -447,15 +476,47 @@ def get_wris_data(
     end_slug = (end_date or time.strftime("%Y-%m-%d"))[:10]
 
     frames = []
+    basin_label = str(basin_name)
+    basin_dir_candidates = [
+        Path(output_dir) / "wris" / basin_label.lower(),
+        Path(output_dir) / "wris" / basin_label,
+    ]
+    # Preserve order while removing duplicates.
+    basin_dir_candidates = list(dict.fromkeys(basin_dir_candidates))
+
     for v in vars_list:
         try:
             flag = _resolve_variable(v)
             folder = DATASETS[flag][1]
         except Exception:
             continue
-        basin_dir = Path(output_dir) / "wris" / str(basin_name).lower()
-        gpkg_path = basin_dir / f"{basin_name}_{folder}_{start_slug}_{end_slug}.gpkg"
-        if not gpkg_path.exists():
+
+        gpkg_candidates = []
+        for basin_dir in basin_dir_candidates:
+            gpkg_candidates.extend(
+                [
+                    basin_dir / f"{basin_label.lower()}_{folder}_{start_slug}_{end_slug}.gpkg",
+                    basin_dir / f"{basin_label}_{folder}_{start_slug}_{end_slug}.gpkg",
+                ]
+            )
+
+        # Preserve order while removing duplicate path candidates.
+        gpkg_candidates = list(dict.fromkeys(gpkg_candidates))
+        gpkg_path = next((p for p in gpkg_candidates if p.exists()), None)
+
+        # Last-resort fallback: look for any matching dataset-period gpkg in
+        # basin-scoped folders (covers legacy/custom naming).
+        if gpkg_path is None:
+            suffix = f"_{folder}_{start_slug}_{end_slug}.gpkg"
+            for basin_dir in basin_dir_candidates:
+                if not basin_dir.exists():
+                    continue
+                matches = sorted([p for p in basin_dir.glob(f"*{suffix}") if p.is_file()])
+                if matches:
+                    gpkg_path = matches[0]
+                    break
+
+        if gpkg_path is None:
             continue
         try:
             gdf = gpd.read_file(gpkg_path)
