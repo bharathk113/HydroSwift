@@ -1,30 +1,88 @@
-# SWIFT Documentation
+# SWIFT 🌊
+### Simple Water Information Fetch Tool
 
-Welcome to the SWIFT docs portal.
+**SWIFT** provides a unified Python API and CLI for accessing
+Indian hydrology datasets from **WRIS** and **CWC**.
 
-SWIFT (Simple Water Information Fetch Tool) provides:
+<div class="grid cards" markdown>
 
-- Python API for WRIS/CWC metadata discovery and downloads
-- CLI workflows for reproducible data retrieval
-- Plotting and merge helpers for post-processing
+- :material-language-python: **Python API**
 
-## Start here
+  Discover stations, query basins, and download time-series data
+  using a clean Python interface.
 
-- [Python API Guide](./PYTHON_API_GUIDE.md)
-- [CLI Usage Guide](./CLI_USAGE_GUIDE.md)
-- [API Functions Reference](./API_FUNCTIONS_REFERENCE.md)
-- [Public API and CLI Map](./PUBLIC_API_AND_CLI.md)
+  [Python API Guide](PYTHON_API_GUIDE.md)
+
+- :material-console: **Command Line Interface**
+
+  Reproducible data downloads directly from the terminal.
+
+  [CLI Usage Guide](CLI_USAGE_GUIDE.md)
+
+- :material-function: **API Reference**
+
+  Complete reference of all public SWIFT functions.
+
+  [API Functions Reference](API_FUNCTIONS_REFERENCE.md)
+
+- :material-notebook-outline: **Interactive Examples**
+
+  Run SWIFT workflows in Jupyter notebooks.
+
+  [Python API Examples](PYTHON_API_EXAMPLES.ipynb)
+
+</div>
+
+---
+
+## Quick example
+
+=== "Python"
+
+    ```python
+    import swift_app as swift
+
+    df = swift.wris.download(
+        basin="Godavari",
+        variable="discharge",
+        start_date="2024-01-01",
+        end_date="2024-01-10",
+    )
+    ```
+
+=== "CLI"
+
+    ```bash
+    swift -b Godavari -q \
+        --start-date 2024-01-01 \
+        --end-date 2024-01-10
+    ```
+
+---
+
+## Documentation structure
+
+| Guide | Description |
+|------|-------------|
+| **Python API Guide** | Complete Python usage documentation |
+| **CLI Usage Guide** | All command line options |
+| **API Functions Reference** | Function signatures and arguments |
+| **Public API and CLI Map** | Cross-reference of CLI ↔ Python |
+
+---
 
 ## Notebook examples
 
-- [CLI Examples Notebook](./CLI_EXAMPLES.ipynb)
-- [Python API Examples Notebook](./PYTHON_API_EXAMPLES.ipynb)
+- [CLI Examples Notebook](CLI_EXAMPLES.ipynb)
+- [Python API Examples Notebook](PYTHON_API_EXAMPLES.ipynb)
 
-## Read the Docs setup notes
+---
 
-This repository is configured for Read the Docs using MkDocs.
-If you fork this project:
+## About SWIFT
 
-1. Import the repo in Read the Docs.
-2. Ensure `.readthedocs.yaml` is detected.
-3. Trigger a build on your default branch.
+SWIFT provides:
+
+- programmatic access to **WRIS hydrology datasets**
+- automated downloads for **CWC water-level data**
+- reproducible CLI workflows
+- built-in plotting and merge utilities

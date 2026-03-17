@@ -1,15 +1,46 @@
 site_name: SWIFT Documentation
-site_description: Simple Water Information Fetch Tool (SWIFT) docs
-site_url: https://swift-wris.readthedocs.io/
+site_description: Simple Water Information Fetch Tool (SWIFT)
 repo_url: https://github.com/carbform/swift
 repo_name: carbform/swift
+edit_uri: edit/main/docs/
 
 theme:
   name: material
+
+  icon:
+    repo: fontawesome/brands/github
+
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+
+    - scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+  font:
+    text: Roboto
+    code: JetBrains Mono
+
   features:
+    - navigation.instant
+    - navigation.tabs
     - navigation.sections
     - navigation.expand
+    - navigation.top
+    - toc.integrate
+    - search.highlight
+    - search.suggest
     - content.code.copy
+    - content.tabs.link
+    - content.code.annotate
 
 plugins:
   - search
@@ -19,10 +50,23 @@ plugins:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - toc:
       permalink: true
+
   - pymdownx.superfences
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+
+  - pymdownx.tabbed:
+      alternate_style: true
+
+  - pymdownx.details
+  - pymdownx.snippets
+  - pymdownx.emoji
 
 nav:
   - Home: index.md
