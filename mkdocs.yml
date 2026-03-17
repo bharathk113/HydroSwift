@@ -1,0 +1,34 @@
+site_name: SWIFT Documentation
+site_description: Simple Water Information Fetch Tool (SWIFT) docs
+site_url: https://swift-wris.readthedocs.io/
+repo_url: https://github.com/carbform/swift
+repo_name: carbform/swift
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+
+nav:
+  - Home: index.md
+  - Python API Guide: PYTHON_API_GUIDE.md
+  - CLI Usage Guide: CLI_USAGE_GUIDE.md
+  - API Functions Reference: API_FUNCTIONS_REFERENCE.md
+  - Public API and CLI Map: PUBLIC_API_AND_CLI.md
+  - CLI Examples Notebook: CLI_EXAMPLES.ipynb
+  - Python API Examples Notebook: PYTHON_API_EXAMPLES.ipynb

@@ -88,6 +88,8 @@ def run_plot_only(args) -> int:
                 file,
                 image_root=image_root,
                 include_images_subdir=False if image_root else True,
+                export_svg=getattr(args, "plot_svg", False),
+                trend_window=getattr(args, "plot_trend_window", None),
             )
             total_plots += 1
 
@@ -117,6 +119,8 @@ def run_plot_only(args) -> int:
                         file,
                         image_root=image_root,
                         include_images_subdir=False if image_root else True,
+                        export_svg=getattr(args, "plot_svg", False),
+                        trend_window=getattr(args, "plot_trend_window", None),
                     )
                     total_plots += 1
 
@@ -141,6 +145,8 @@ def run_plot_only(args) -> int:
                         file,
                         image_root=image_root,
                         include_images_subdir=False if image_root else True,
+                        export_svg=getattr(args, "plot_svg", False),
+                        trend_window=getattr(args, "plot_trend_window", None),
                     )
                     total_plots += 1
 

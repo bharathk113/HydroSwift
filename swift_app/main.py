@@ -103,7 +103,7 @@ def main() -> int:
     if args.coffee:
         _print_coffee()
 
-        if not any([args.basin, args.cwc, args.cwc_station, args.plot_only]):
+        if not any([args.basin, args.cwc, args.cwc_station, getattr(args, "cwc_basin_filter", None), args.plot_only]):
             return 0
 
     # ---------------------------------------------------------
@@ -211,7 +211,7 @@ def main() -> int:
     # CWC compatibility check
     # ---------------------------------------------------------
 
-    if args.cwc:
+    if args.cwc or getattr(args, "cwc_basin_filter", None):
 
         unsupported = []
 
@@ -242,7 +242,7 @@ def main() -> int:
     # CWC download
     # ---------------------------------------------------------
 
-    if args.cwc or args.cwc_station:
+    if args.cwc or args.cwc_station or getattr(args, "cwc_basin_filter", None):
         return run_cwc_download(args)
 
     # ---------------------------------------------------------

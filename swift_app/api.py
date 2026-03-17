@@ -11,9 +11,6 @@ Top-level helpers:
     swift.fetch(source, ...)
     swift.merge_only(...)
     swift.plot_only(...)
-    # Backward compatible aliases:
-    swift.merge(...)  # deprecated alias
-    swift.plot(...)   # deprecated alias
 """
 
 from __future__ import annotations
@@ -225,6 +222,8 @@ def _build_args(**kwargs):
     args.delay = kwargs.get("delay", 0.25)
     args.format = kwargs.get("format", "csv")
     args.plot = kwargs.get("plot", False)
+    args.plot_svg = kwargs.get("plot_svg", False)
+    args.plot_trend_window = kwargs.get("plot_trend_window")
     args.metadata = kwargs.get("metadata", False)
     args.quiet = kwargs.get("quiet", False)
     args.cwc = kwargs.get("cwc", False)
@@ -953,9 +952,8 @@ class _WrisNamespace:
 
         Parameters
         ----------
-        basin : str or int, optional
-            Basin name or number. Optional when ``station`` is provided as a
-            WRIS station table (for example from ``swift.wris.stations(...)``).
+        basin : str, int, or list, required
+            Basin name/number (or list of basin names/numbers).
         variable : str or list[str]
             Dataset variable(s) (``'discharge'``, ``'rainfall'``, etc.).
         station : str or list[str], optional
@@ -976,43 +974,15 @@ class _WrisNamespace:
 
         station_input = station if station is not None else stations
 
-        # Table-compliant path: allow direct hand-off from wris.stations()
-        # or wris.basins(variable=...) similarly to swift.fetch(...).
-        if isinstance(basin, pd.DataFrame):
-            return fetch(
-                basin,
-                output_dir=output_dir,
-                start_date=start_date,
-                end_date=end_date,
-                format=format,
-                overwrite=overwrite,
-                merge=merge,
-                plot=plot,
-                quiet=quiet,
-                delay=delay,
-            )
-
-        # Also allow station tables passed via keyword argument:
-        # swift.wris.download(station=swift.wris.stations(...), ...)
-        # This mirrors CWC ergonomics and keeps notebook usage concise.
-        if isinstance(station_input, pd.DataFrame):
-            return fetch(
-            station_input,
-                output_dir=output_dir,
-                start_date=start_date,
-                end_date=end_date,
-                format=format,
-                overwrite=overwrite,
-                merge=merge,
-                plot=plot,
-                quiet=quiet,
-                delay=delay,
+        if isinstance(basin, pd.DataFrame) or isinstance(station_input, pd.DataFrame):
+            raise TypeError(
+                "swift.wris.download() accepts explicit basin/variable/station values only. "
+                "For WRIS station/basin tables, use swift.fetch(table, ...)."
             )
 
         if basin is None:
             raise ValueError(
-                "basin is required for swift.wris.download() unless station is "
-                "provided as a WRIS stations table (DataFrame)."
+                "basin is required for swift.wris.download()."
             )
 
         if variable is None:
@@ -1215,50 +1185,16 @@ class _CwcNamespace:
 
         Notes
         -----
-        - Basin filtering is supported for CWC downloads and is applied before download. This mirrors the behavior of fetch() and WRIS downloads.
+        - Basin filtering is supported for CWC downloads and is applied before download.
         - If both station and basin are provided, only stations present in both are downloaded.
         - If no stations match the basin filter, a ValueError is raised.
+        - Table-like inputs (for example from ``swift.cwc.stations()`` or
+          ``swift.cwc.basins()``) should be passed to ``swift.fetch(...)``.
         """
-        # Allow passing DataFrames directly as the first positional argument.
-        if isinstance(station, pd.DataFrame):
-            if "code" not in station.columns:
-                raise ValueError("CWC stations table must include 'code' column")
-            station_codes = _unique_preserve_order(station["code"].dropna().tolist())
-            return get_cwc_data(
-                station=station_codes,
-                basin=basin,
-                start_date=start_date,
-                end_date=end_date,
-                output_dir=output_dir,
-                format=format,
-                overwrite=overwrite,
-                merge=merge,
-                plot=plot,
-                quiet=quiet,
-                refresh=refresh,
-                name_by=_name_by,
-                gpkg_group=_gpkg_group,
-            )
-
-        # Also allow basin tables via keyword input: swift.cwc.download(basin=table).
-        if isinstance(basin, pd.DataFrame):
-            if "basin" not in basin.columns:
-                raise ValueError("CWC basin table input must include a 'basin' column")
-            basin_filters = _unique_preserve_order(basin["basin"].dropna().tolist())
-            return get_cwc_data(
-                station=station,
-                basin=basin_filters,
-                start_date=start_date,
-                end_date=end_date,
-                output_dir=output_dir,
-                format=format,
-                overwrite=overwrite,
-                merge=merge,
-                plot=plot,
-                quiet=quiet,
-                refresh=refresh,
-                name_by=_name_by,
-                gpkg_group=_gpkg_group,
+        if isinstance(station, pd.DataFrame) or isinstance(basin, pd.DataFrame):
+            raise TypeError(
+                "swift.cwc.download() accepts explicit station/basin values only. "
+                "For CWC station/basin tables, use swift.fetch(table, ...)."
             )
 
         return get_cwc_data(
@@ -2039,6 +1975,8 @@ def plot_only(
     *,
     mode=None,
     variable=None,
+    plot_svg=False,
+    plot_trend_window=None,
 ):
     """
     Generate hydrograph plots from existing SWIFT output.
@@ -2094,43 +2032,12 @@ def plot_only(
         plot_only=True,
         dataset_flags=dataset_flags,
         cwc=cwc,
+        plot_svg=plot_svg,
+        plot_trend_window=plot_trend_window,
     )
     run_plot_only(args)
     return None
 
-
-def merge(
-    input_dir=None,
-    output_dir=None,
-    *,
-    mode=None,
-    variable=None,
-):
-    """Backward-compatible alias for :func:`merge_only`."""
-    return merge_only(
-        input_dir=input_dir,
-        output_dir=output_dir,
-        mode=mode,
-        variable=variable,
-    )
-
-
-def plot(
-    input_dir=None,
-    output_dir=None,
-    cwc=False,
-    *,
-    mode=None,
-    variable=None,
-):
-    """Backward-compatible alias for :func:`plot_only`."""
-    return plot_only(
-        input_dir=input_dir,
-        output_dir=output_dir,
-        cwc=cwc,
-        mode=mode,
-        variable=variable,
-    )
 
 
 # ---------------------------------------------------------

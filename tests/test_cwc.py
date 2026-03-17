@@ -1,17 +1,17 @@
 import sys
 from pathlib import Path
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from types import SimpleNamespace
 import importlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from swift_app.cwc import fetch_station_data, download_station
+cwc_mod = importlib.import_module("swift_app.cwc")
+fetch_station_data = cwc_mod.fetch_station_data
+download_station = cwc_mod.download_station
 
 
-@patch("swift_app.cwc.session.get")
-@patch("time.sleep")
-def test_cwc_download_retry_logic(mock_sleep, mock_get):
+def test_cwc_download_retry_logic(monkeypatch):
     """Test exponential backoff logic for CWC downloads."""
     
     # Mock sequence: failure, failure, success
@@ -24,10 +24,13 @@ def test_cwc_download_retry_logic(mock_sleep, mock_get):
         {"stationCode": "TestStation", "id": {"dataTime": "2026-03-01"}, "dataValue": 10.5}
     ]
     
-    mock_get.side_effect = [mock_resp_fail, mock_resp_fail, mock_resp_succ]
-    
-    # Ensure it works after failures
-    result = fetch_station_data("TestStation")
+    mock_get = MagicMock(side_effect=[mock_resp_fail, mock_resp_fail, mock_resp_succ])
+    monkeypatch.setattr(cwc_mod.session, "get", mock_get)
+
+    from unittest.mock import patch
+    with patch("time.sleep") as mock_sleep:
+        # Ensure it works after failures
+        result = fetch_station_data("TestStation")
     assert result is not None
     assert len(result) == 1
     assert result["water_level"].iloc[0] == 10.5
