@@ -52,60 +52,12 @@ def cli_help():
 
 
 def help():
-    """Print Python API-oriented help for interactive users.
+    """Print command-line help text (equivalent to ``swift -h``).
 
-    This is designed for notebooks / REPL sessions and mirrors the public API
-    overview documented in ``docs/PUBLIC_API_AND_CLI.md``.
+    This mirrors historical package behavior and keeps ``swift.help()``
+    aligned with CLI parser output used by tests and documentation checks.
     """
-    print(
-        """
-SWIFT Python API help
-=====================
-
-Namespaces
-----------
-- swift.wris.download(basin, variable, ...)
-- swift.wris.stations(basin, variable, delay=0.25)
-- swift.cwc.download(station=None, ...)
-- swift.cwc.stations(station=None, basin=None, river=None, state=None, refresh=False)
-
-Core helpers
-------------
-- swift.fetch(stations_df, ...)
-- swift.merge_only(input_dir=None, output_dir=None, mode=None, variable=None)
-- swift.plot_only(input_dir=None, output_dir=None, cwc=False, mode=None, variable=None)
-
-Backward-compatible aliases
----------------------------
-- swift.merge(...)
-- swift.plot(...)
-
-Utility helpers
----------------
-- swift.cite()
-- swift.coffee()
-- swift.wris.variables()  (WRIS variable table)
-- swift.wris.basins(variable=...)  (WRIS basin table; optionally expanded by variable)
-- swift.cwc.basins()      (CWC basin table from station metadata)
-
-Quick examples
---------------
-1) Download WRIS discharge for Krishna:
-    swift.wris.download(basin="Krishna", variable="discharge")
-
-2) Query stations then fetch:
-    stations = swift.wris.stations(basin=["Godavari", "Krishna"], variable=["solar", "sediment"])
-    swift.fetch(stations, output_dir="output", merge=True, plot=True)
-
-3) Download CWC data:
-    swift.cwc.download(station=["040-CDJAPR"], start_date="2024-01-01", end_date="2024-01-07")
-
-Need CLI help instead?
-----------------------
-Use: swift.cli_help()   # equivalent to `swift -h`
-        """.strip()
-    )
-    return None
+    return cli_help()
 
 
 # ---------------------------------------------------------
@@ -244,6 +196,19 @@ def _normalize_dataset_flags(datasets):
                 f"Unknown dataset: {d}. Supported values: {', '.join(valid)}"
             )
     return flags
+
+
+def _unique_preserve_order(values):
+    """Return de-duplicated non-empty string values preserving first-seen order."""
+    seen = set()
+    out = []
+    for v in values:
+        s = str(v).strip()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
 
 
 def _build_args(**kwargs):
@@ -435,9 +400,10 @@ def get_wris_data(
     try:
         var_desc = ", ".join(datasets)
         print(
-            f"Starting WRIS download for basin={basin_name!r}, "
+            f"Searching WRIS database for basin={basin_name!r}, "
             f"Variables={var_desc} "
             f"from {start_date or '1950-01-01'} to {end_date or 'latest'}..."
+            f"This might take a while..."
         )
     except Exception:
         # Best-effort only; never fail because of a progress message.
@@ -601,12 +567,8 @@ def get_cwc_data(
 
     if basins:
         basin_meta = cwc_stations(basin=basins, refresh=refresh)
-        basin_codes = sorted(
-            {
-                str(c).strip()
-                for c in basin_meta["code"].dropna().tolist()
-                if str(c).strip()
-            }
+        basin_codes = _unique_preserve_order(
+            basin_meta["code"].dropna().tolist()
         )
 
         if not basin_codes:
@@ -618,7 +580,8 @@ def get_cwc_data(
         if cwc_station is None:
             cwc_station = basin_codes
         else:
-            cwc_station = sorted(set(cwc_station).intersection(basin_codes))
+            basin_set = set(basin_codes)
+            cwc_station = [code for code in _unique_preserve_order(cwc_station) if code in basin_set]
             if not cwc_station:
                 raise ValueError(
                     "No overlap between requested station code(s) and basin filter. "
@@ -789,7 +752,7 @@ def wris_stations(basin, var, delay=0.25):
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    print("Searching the WRIS database... This might take some time.")
+    print("Searching the WRIS database... This might take a while...")
 
     # -- normalise inputs to lists --------------------------------
     if var is None:
@@ -971,10 +934,11 @@ class _WrisNamespace:
 
     @staticmethod
     def download(
-        basin,
+        basin=None,
         variable=None,
         *,
         station=None,
+        stations=None,
         start_date="1950-01-01",
         end_date=None,
         output_dir="output",
@@ -989,12 +953,15 @@ class _WrisNamespace:
 
         Parameters
         ----------
-        basin : str or int
-            Basin name or number.
+        basin : str or int, optional
+            Basin name or number. Optional when ``station`` is provided as a
+            WRIS station table (for example from ``swift.wris.stations(...)``).
         variable : str or list[str]
             Dataset variable(s) (``'discharge'``, ``'rainfall'``, etc.).
         station : str or list[str], optional
             Limit to specific station code(s).
+        stations : str or list[str], optional
+            Alias for ``station``.
         start_date, end_date : str
             ISO date strings.
         output_dir : str
@@ -1004,6 +971,11 @@ class _WrisNamespace:
         delay : float
             Seconds between API requests.
         """
+        if station is not None and stations is not None:
+            raise ValueError("Provide only one of 'station' or 'stations', not both.")
+
+        station_input = station if station is not None else stations
+
         # Table-compliant path: allow direct hand-off from wris.stations()
         # or wris.basins(variable=...) similarly to swift.fetch(...).
         if isinstance(basin, pd.DataFrame):
@@ -1020,6 +992,29 @@ class _WrisNamespace:
                 delay=delay,
             )
 
+        # Also allow station tables passed via keyword argument:
+        # swift.wris.download(station=swift.wris.stations(...), ...)
+        # This mirrors CWC ergonomics and keeps notebook usage concise.
+        if isinstance(station_input, pd.DataFrame):
+            return fetch(
+            station_input,
+                output_dir=output_dir,
+                start_date=start_date,
+                end_date=end_date,
+                format=format,
+                overwrite=overwrite,
+                merge=merge,
+                plot=plot,
+                quiet=quiet,
+                delay=delay,
+            )
+
+        if basin is None:
+            raise ValueError(
+                "basin is required for swift.wris.download() unless station is "
+                "provided as a WRIS stations table (DataFrame)."
+            )
+
         if variable is None:
             raise ValueError(
                 "variable is required for swift.wris.download() when basin is "
@@ -1029,7 +1024,7 @@ class _WrisNamespace:
         return get_wris_data(
             var=variable,
             basin=basin,
-            station=station,
+            station=station_input,
             start_date=start_date,
             end_date=end_date,
             output_dir=output_dir,
@@ -1226,34 +1221,44 @@ class _CwcNamespace:
         """
         # Allow passing DataFrames directly as the first positional argument.
         if isinstance(station, pd.DataFrame):
-            return fetch(
-                station,
-                output_dir=output_dir,
+            if "code" not in station.columns:
+                raise ValueError("CWC stations table must include 'code' column")
+            station_codes = _unique_preserve_order(station["code"].dropna().tolist())
+            return get_cwc_data(
+                station=station_codes,
+                basin=basin,
                 start_date=start_date,
                 end_date=end_date,
+                output_dir=output_dir,
                 format=format,
                 overwrite=overwrite,
                 merge=merge,
                 plot=plot,
                 quiet=quiet,
                 refresh=refresh,
+                name_by=_name_by,
+                gpkg_group=_gpkg_group,
             )
 
         # Also allow basin tables via keyword input: swift.cwc.download(basin=table).
         if isinstance(basin, pd.DataFrame):
             if "basin" not in basin.columns:
                 raise ValueError("CWC basin table input must include a 'basin' column")
-            return fetch(
-                basin,
-                output_dir=output_dir,
+            basin_filters = _unique_preserve_order(basin["basin"].dropna().tolist())
+            return get_cwc_data(
+                station=station,
+                basin=basin_filters,
                 start_date=start_date,
                 end_date=end_date,
+                output_dir=output_dir,
                 format=format,
                 overwrite=overwrite,
                 merge=merge,
                 plot=plot,
                 quiet=quiet,
                 refresh=refresh,
+                name_by=_name_by,
+                gpkg_group=_gpkg_group,
             )
 
         return get_cwc_data(
@@ -1423,7 +1428,8 @@ def fetch(
     if not isinstance(stations, pd.DataFrame):
         raise TypeError(
             "fetch() expects a pandas DataFrame/SwiftTable from "
-            "swift.wris.stations(...) or swift.cwc.stations(...)."
+            "swift.wris.stations(...), swift.cwc.stations(...), "
+            "swift.wris.basins(...), or swift.cwc.basins(...)."
         )
 
     source = stations.attrs.get("source") or stations.attrs.get("fetch_source")
@@ -1529,9 +1535,9 @@ def fetch(
 
             # Explicit warning because this path downloads all stations per basin.
             warnings.warn(
-                "Fetching WRIS data for basin-level input (all stations per basin/variable). "
+                "Fetching WRIS data for basin-level input. "
                 f"Dispatching {len(unique_combos)} basin-variable combinations; "
-                "this may take a long time.",
+                "this may take a long time...",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1658,11 +1664,11 @@ def fetch(
                     "Use swift.cwc.basins() or provide a non-empty 'basin' column."
                 )
 
-            unique_basins = sorted({row["basin"] for _, row in basin_df.iterrows()})
+            unique_basins = _unique_preserve_order(basin_df["basin"].tolist())
 
             warnings.warn(
-                "Fetching CWC data for basin-level input (all stations per basin). "
-                f"Dispatching {len(unique_basins)} basins; this may take a long time.",
+                "Fetching CWC data for basin-level input. "
+                f"Dispatching {len(unique_basins)} basins; this might take a while...",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1673,6 +1679,7 @@ def fetch(
                 _pd = None
 
             frames = []
+            total_dispatched_stations = 0
             for grp_basin in unique_basins:
                 basin_stations = cwc_ns.stations(
                     basin=grp_basin,
@@ -1680,15 +1687,12 @@ def fetch(
                 )
                 if "code" not in basin_stations.columns:
                     continue
-                codes = sorted(
-                    {
-                        str(c).strip()
-                        for c in basin_stations["code"].dropna().tolist()
-                        if str(c).strip()
-                    }
+                codes = _unique_preserve_order(
+                    basin_stations["code"].dropna().tolist()
                 )
                 if not codes:
                     continue
+                total_dispatched_stations += len(codes)
                 res = cwc_ns.download(
                     station=codes,
                     basin=grp_basin,
@@ -1705,6 +1709,17 @@ def fetch(
                 )
                 if res is not None and _pd is not None and hasattr(res, "assign"):
                     frames.append(res.assign(basin=str(grp_basin)))
+
+            if not quiet and total_dispatched_stations > 0:
+                print(
+                    "CWC basin-dispatch summary: "
+                    f"{len(unique_basins)} basins, "
+                    f"{total_dispatched_stations} stations targeted in total."
+                )
+                print(
+                    "Note: per-basin download tables report stations with data in the "
+                    "requested period, so they can be lower than targeted station counts."
+                )
 
             if not frames or _pd is None:
                 return None
@@ -1749,13 +1764,7 @@ def fetch(
                     grp_basin, grp_state = group_key
                 else:
                     grp_basin, grp_state = group_key, None
-                codes = sorted(
-                    {
-                        str(c).strip()
-                        for c in grp_df["code"].dropna().tolist()
-                        if str(c).strip()
-                    }
-                )
+                codes = _unique_preserve_order(grp_df["code"].dropna().tolist())
                 if not codes:
                     continue
                 gpkg_group = str(grp_basin)
@@ -1785,13 +1794,7 @@ def fetch(
                 return None
             return _pd.concat(frames, ignore_index=True)
 
-        station_codes = sorted(
-            {
-                str(code).strip()
-                for code in stations["code"].dropna().tolist()
-                if str(code).strip()
-            }
-        )
+        station_codes = _unique_preserve_order(stations["code"].dropna().tolist())
         if not station_codes:
             raise ValueError("CWC station table has no valid code entries.")
         return cwc_ns.download(

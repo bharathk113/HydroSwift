@@ -401,7 +401,7 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
                 print(f"{Console.ITALIC}Tip: call with overwrite=True to refresh data.{Console.RESET}")
             logger.log("INFO", f"Skipped {skipped} existing stations")
 
-        counter = {"downloaded": 0}
+        counter = {"downloaded": 0, "failed_or_empty": 0}
         downloaded_files = []
 
         # ---------------------------------------------------------
@@ -415,6 +415,8 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
             else:
                 meta = client.get_metadata(station_code, dataset_code)
                 if not meta:
+                    with lock:
+                        counter["failed_or_empty"] += 1
                     logger.log("WARN", f"No metadata found for station: {station_code}")
                     return
                 metadata_cache[station_code] = meta
@@ -427,6 +429,8 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
             )
 
             if frame is None or frame.empty:
+                with lock:
+                    counter["failed_or_empty"] += 1
                 logger.log("WARN", f"No data returned for station: {station_code}")
                 return
 
@@ -447,6 +451,10 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
                     counter["downloaded"] += 1
                     downloaded_files.append(outfile)
                 logger.log("SUCCESS", f"Downloaded {station_code} -> {os.path.basename(outfile)}")
+            else:
+                with lock:
+                    counter["failed_or_empty"] += 1
+                logger.log("WARN", f"Failed to save output for station: {station_code}")
 
         # ---------------------------------------------------------
         # Parallel download
@@ -528,17 +536,28 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
                 print()
             Console.success(f"{folder} downloaded in {runtime} seconds")
 
-        found = counter["downloaded"] + skipped
+        selected = len(stations_for_run)
+        attempted = remaining
 
         summary.append({
             "dataset": folder,
-            "found": found,
+            "selected": selected,
+            "attempted": attempted,
             "downloaded": counter["downloaded"],
             "skipped": skipped,
+            "failed_or_empty": counter["failed_or_empty"],
             "time": runtime
         })
         
-        logger.log("INFO", f"Finished {folder}: Downloaded {counter['downloaded']}, Skipped {skipped} in {runtime}s")
+        logger.log(
+            "INFO",
+            (
+                f"Finished {folder}: "
+                f"Selected {selected}, Attempted {attempted}, "
+                f"Downloaded {counter['downloaded']}, Skipped {skipped}, "
+                f"NoData/Failed {counter['failed_or_empty']} in {runtime}s"
+            ),
+        )
 
     # ---------------------------------------------------------
     # Save updated station cache
@@ -559,15 +578,25 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
         print("\n-------------------------------------------------------------")
         print("Download Summary")
         print("-------------------------------------------------------------")
-        print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
+        print(
+            f"{'Dataset':<18}"
+            f"{'Selected':<10}"
+            f"{'Attempted':<11}"
+            f"{'Downloaded':<12}"
+            f"{'Skipped':<9}"
+            f"{'NoData/Fail':<13}"
+            f"{'Time(s)'}"
+        )
         print("-------------------------------------------------------------")
 
         for item in summary:
             print(
                 f"{item['dataset']:<18}"
-                f"{item['found']:<12}"
+                f"{item['selected']:<10}"
+                f"{item['attempted']:<11}"
                 f"{item['downloaded']:<12}"
-                f"{item['skipped']:<12}"
+                f"{item['skipped']:<9}"
+                f"{item['failed_or_empty']:<13}"
                 f"{item['time']}"
             )
 

@@ -1026,6 +1026,7 @@ def run_cwc_download(args):
         logger.log("INFO", f"Skipped {skipped} existing stations")
 
     downloaded = 0
+    failed_or_empty = 0
     downloaded_codes = []
     workers = min(32, max(8, (os.cpu_count() or 1) * 4))
 
@@ -1060,8 +1061,10 @@ def run_cwc_download(args):
                     downloaded_codes.append((str(stcode).strip(), outdir))
                     logger.log("SUCCESS", f"Downloaded {stcode}")
                 elif result is False or result is None:
+                    failed_or_empty += 1
                     logger.log("WARN", f"Failed or empty data for {stcode}")
             except Exception as e:
+                failed_or_empty += 1
                 logger.log("ERROR", f"Worker crash: {str(e)}")
 
     else:
@@ -1166,21 +1169,40 @@ def run_cwc_download(args):
             print()
         Console.success(f"water_level downloaded in {runtime} seconds")
 
-    found = downloaded + skipped
+    attempted = remaining
+    selected = n_stations
     
-    logger.log("INFO", f"Finished CWC: Downloaded {downloaded}, Skipped {skipped} in {runtime}s")
+    logger.log(
+        "INFO",
+        (
+            "Finished CWC: "
+            f"Selected {selected}, Attempted {attempted}, "
+            f"Downloaded {downloaded}, Skipped {skipped}, "
+            f"NoData/Failed {failed_or_empty} in {runtime}s"
+        ),
+    )
 
     if not Console.is_quiet:
         print("\n-------------------------------------------------------------")
         print("Download Summary")
         print("-------------------------------------------------------------")
-        print(f"{'Dataset':<18}{'Found':<12}{'Downloaded':<12}{'Skipped':<12}{'Time(s)'}")
+        print(
+            f"{'Dataset':<18}"
+            f"{'Selected':<10}"
+            f"{'Attempted':<11}"
+            f"{'Downloaded':<12}"
+            f"{'Skipped':<9}"
+            f"{'NoData/Fail':<13}"
+            f"{'Time(s)'}"
+        )
         print("-------------------------------------------------------------")
         print(
             f"{'water_level':<18}"
-            f"{found:<12}"
+            f"{selected:<10}"
+            f"{attempted:<11}"
             f"{downloaded:<12}"
-            f"{skipped:<12}"
+            f"{skipped:<9}"
+            f"{failed_or_empty:<13}"
             f"{runtime}"
         )
         print("-------------------------------------------------------------")

@@ -314,6 +314,121 @@ def test_wris_namespace_download_accepts_station_table(monkeypatch, tmp_path):
     assert calls["kwargs"]["plot"] is True
 
 
+def test_wris_namespace_download_accepts_station_table_via_station_kwarg_without_basin(
+    monkeypatch, tmp_path
+):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_fetch(stations, **kwargs):
+        calls["cols"] = list(stations.columns)
+        calls["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(api_mod, "fetch", fake_fetch)
+
+    stations = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "station_code": ["ST001", "ST002"],
+                "basin": ["Godavari", "Godavari"],
+                "variable": ["discharge", "discharge"],
+            }
+        )
+    )
+    stations.attrs["source"] = "wris"
+
+    api_mod.wris.download(
+        station=stations,
+        start_date="2024-01-01",
+        end_date="2024-01-07",
+        output_dir=tmp_path,
+        format="csv",
+        overwrite=False,
+        merge=True,
+        plot=False,
+        quiet=True,
+    )
+
+    assert "station_code" in calls["cols"]
+    assert calls["kwargs"]["start_date"] == "2024-01-01"
+    assert calls["kwargs"]["merge"] is True
+
+
+def test_wris_namespace_download_accepts_station_table_even_with_basin_present(
+    monkeypatch, tmp_path
+):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_fetch(stations, **kwargs):
+        calls["cols"] = list(stations.columns)
+        calls["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(api_mod, "fetch", fake_fetch)
+
+    stations = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "station_code": ["ST001", "ST002"],
+                "basin": ["Godavari", "Godavari"],
+                "variable": ["discharge", "discharge"],
+            }
+        )
+    )
+    stations.attrs["source"] = "wris"
+
+    api_mod.wris.download(
+        basin="Krishna",
+        station=stations,
+        start_date="2024-01-01",
+        end_date="2024-01-07",
+        output_dir=tmp_path,
+        quiet=True,
+    )
+
+    assert "station_code" in calls["cols"]
+    assert calls["kwargs"]["start_date"] == "2024-01-01"
+
+
+def test_wris_namespace_download_accepts_stations_alias(monkeypatch, tmp_path):
+    import swift_app.api as api_mod
+
+    calls = {}
+
+    def fake_fetch(stations, **kwargs):
+        calls["cols"] = list(stations.columns)
+        calls["kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(api_mod, "fetch", fake_fetch)
+
+    stations = api_mod.SwiftTable(
+        pd.DataFrame(
+            {
+                "station_code": ["ST001", "ST002"],
+                "basin": ["Godavari", "Godavari"],
+                "variable": ["discharge", "discharge"],
+            }
+        )
+    )
+    stations.attrs["source"] = "wris"
+
+    api_mod.wris.download(
+        stations=stations,
+        start_date="2024-01-01",
+        end_date="2024-01-07",
+        output_dir=tmp_path,
+        quiet=True,
+    )
+
+    assert "station_code" in calls["cols"]
+    assert calls["kwargs"]["end_date"] == "2024-01-07"
+
+
 def test_wris_namespace_download_accepts_basin_table(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
