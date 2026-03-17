@@ -57,46 +57,74 @@ After installation, verify SWIFT is working by running:
 
 This should display the SWIFT command-line interface and available options.
 
+## Documentation
+
+- Python API guide: `docs/PYTHON_API_GUIDE.md`
+- CLI usage guide: `docs/CLI_USAGE_GUIDE.md`
+- CLI examples notebook: `docs/CLI_EXAMPLES.ipynb`
+- Python API examples notebook: `docs/PYTHON_API_EXAMPLES.ipynb`
+- API reference table: `docs/API_FUNCTIONS_REFERENCE.md`
+- Web docs build config: `mkdocs.yml` + `.readthedocs.yaml`
+
 ## Python API Usage
 
-SWIFT is primarily designed as a robust Python module for programmatic use in your research scripts and Jupyter Notebooks.
+SWIFT is primarily designed as a Python module for scripts and Jupyter notebooks.
 
 ```python
-import swift_app
+import swift_app as swift
 
-# 1. List available stations
-wris_stations = swift_app.wris.stations(basin="Godavari", variable="discharge")
-cwc_stations = swift_app.cwc.stations()
+# Discover metadata tables
+wris_vars = swift.wris.variables()
+wris_basins = swift.wris.basins(variable=["discharge", "rainfall"])
+cwc_basins = swift.cwc.basins()
 
-# 2. Download specific CWC stations
-swift_app.cwc.download(
-    station=["040-CDJAPR", "038-CDJAPR"],
-    start_date="2010-01-01",
-    format="xlsx",
-    plot=True,
-)
-
-# 3. Download an entire WRIS basin
-swift_app.wris.download(
-    basin="Krishna",
-    variable="discharge",
+# Explicit namespace downloads (direct values only)
+swift.wris.download(
+    basin=["Krishna", "Godavari"],
+    variable=["discharge", "rainfall"],
+    start_date="2024-01-01",
+    end_date="2024-03-31",
     merge=True,
-    quiet=True,
 )
 
-# Or use the unified entry point with station tables
-swift_stations = swift_app.wris.stations(basin="Krishna", variable="discharge")
-swift_app.fetch(swift_stations, merge=True, quiet=True)
+swift.cwc.download(
+    station=["040-CDJAPR", "032-LGDHYD"],
+    start_date="2024-01-01",
+    end_date="2024-01-07",
+    merge=True,
+)
 
-cwc_stations = swift_app.cwc.stations(station="040-CDJAPR")
-swift_app.fetch(cwc_stations)
+# Unified table-driven workflow (recommended for station/basin tables)
+wris_stations = swift.wris.stations(basin="Krishna", variable="discharge")
+swift.fetch(wris_stations, merge=True)
 
-# Supported variable names: discharge, water_level, rainfall, temperature,
-# humidity, solar_radiation, sediment, groundwater_level
+cwc_stations = swift.cwc.stations(basin=["Krishna", "Godavari"])
+swift.fetch(cwc_stations, merge=True)
+
+# Basin table -> fetch
+swift.fetch(swift.wris.basins(variable="solar"), start_date="2024-01-01")
+swift.fetch(swift.cwc.basins().head(2), start_date="2024-01-01")
 ```
 
-> Note: legacy `swift.datasets` and `swift.basins()` are removed.
-> Use `swift_app.wris.variables()`, `swift_app.wris.basins()`, and `swift_app.cwc.basins()`.
+### Public API summary
+
+- `swift.wris.download(...)`: WRIS download using explicit `basin` + `variable` inputs.
+- `swift.cwc.download(...)`: CWC download using explicit `station` and/or `basin` inputs.
+- `swift.fetch(table, ...)`: generic entry point for WRIS/CWC station or basin tables.
+- `swift.wris.stations(...)`, `swift.cwc.stations(...)`: metadata discovery tables.
+- `swift.wris.variables()`, `swift.wris.basins(...)`, `swift.cwc.basins(...)`: lookup tables.
+- `swift.merge_only(...)`, `swift.plot_only(...)`: post-processing helpers.
+
+> Note: namespace downloads intentionally reject DataFrame/table arguments.
+> Pass tables to `swift.fetch(...)` instead.
+
+> Legacy note: `swift.datasets` and `swift.basins()` are removed.
+
+### Metadata behavior
+
+- WRIS metadata is discovered on request during station lookup/download workflows.
+- CWC metadata is packaged (and optionally cached/refreshed) to avoid unnecessary API calls, because it is mostly static and usually changes only when station/HFL metadata updates.
+- `swift.cwc.stations(..., refresh=True)` first refreshes live metadata and then applies filters such as `basin="Krishna"`.
 
 ------------------------------------------------------------
 
@@ -116,21 +144,33 @@ This command will:
 
 ### CLI Examples
 
-Download multiple datasets:
+Download multiple datasets (short flags):
 
     swift -b godavari -q -rf -temp
+
+Same command with Python-like long variable names:
+
+    swift -b godavari --discharge --rainfall --temperature
 
 Download CWC gauge water level data:
 
     swift --cwc
 
+Download selected CWC stations (aliases: `--cwc-station` or `--station`):
+
+    swift --station 040-CDJAPR 032-LGDHYD
+
+Filter CWC download by basin names:
+
+    swift --cwc-basin Krishna Godavari
+
 Merge downloaded station datasets into a GeoPackage:
 
     swift -b krishna -q --merge
 
-Generate time series plots from downloaded data:
+Generate publication-ready plots from downloaded data:
 
-    swift --plot-only --input-dir output
+    swift --plot-only --input-dir output --plot-trend-window 30 --plot-svg
 
 Run silently (no console UI):
 
@@ -144,17 +184,18 @@ List WRIS basins and CWC station availability info:
 
 OUTPUT STRUCTURE
 
-Downloaded datasets are organized by basin and variable:
+Downloaded datasets are organized under source-specific folders:
 
 output/
-  krishna/
-    discharge/
-      station1.csv
-      station2.csv
-    rainfall/
-    temperature/
+  wris/
+    <basin>/
+      <variable>/
+      *.gpkg
+  cwc/
+    <basin-or-group>/stations/
+    cwc_waterlevel*.gpkg
 
-Merged geospatial datasets are stored as GeoPackage files in the basin level folder.
+Exact file names include date windows and dataset labels used during download.
 
 ------------------------------------------------------------
 
@@ -194,3 +235,12 @@ The software uses several open‑source Python libraries including:
 - geopandas
 - matplotlib
 - requests
+
+
+### Build docs locally
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs build --strict
+mkdocs serve
+```

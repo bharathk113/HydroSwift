@@ -23,8 +23,6 @@ from .api import (
     cli_help,
     merge_only,
     plot_only,
-    merge,
-    plot,
     fetch,
     cite,
     coffee,
@@ -40,6 +38,12 @@ _LEGACY_API_REDIRECTS = {
     "basins": (
         "`swift.basins()` has been removed. "
         "Use `swift.wris.basins()` for WRIS basins or `swift.cwc.basins()` for CWC basins."
+    ),
+    "merge": (
+        "`swift.merge()` has been removed. Use `swift.merge_only()` instead."
+    ),
+    "plot": (
+        "`swift.plot()` has been removed. Use `swift.plot_only()` instead."
     ),
 }
 
