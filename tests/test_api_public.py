@@ -998,7 +998,7 @@ def test_plot_only_input_dir_must_exist(tmp_path):
         )
 
 
-def test_plot_only_accepts_trend_window_alias(monkeypatch, tmp_path):
+def test_plot_only_prefers_window_aliases(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -1006,21 +1006,21 @@ def test_plot_only_accepts_trend_window_alias(monkeypatch, tmp_path):
     calls = {}
 
     def fake_run_plot_only(args):
-        calls["plot_trend_window"] = getattr(args, "plot_trend_window", None)
+        calls["plot_moving_average_window"] = getattr(args, "plot_moving_average_window", None)
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
     api_mod.plot_only(
         mode="wris",
         output_dir=str(tmp_path),
-        plot_trend_window=True,
-        trend_window=30,
+        moving_average=True,
+        window=30,
     )
 
-    assert calls["plot_trend_window"] == 30
+    assert calls["plot_moving_average_window"] == 30
 
 
-def test_plot_only_bool_trend_window_defaults_to_30(monkeypatch, tmp_path):
+def test_plot_only_bool_moving_average_defaults_to_30(monkeypatch, tmp_path):
     import swift_app.api as api_mod
 
     (tmp_path / "wris" / "krishna").mkdir(parents=True)
@@ -1028,17 +1028,17 @@ def test_plot_only_bool_trend_window_defaults_to_30(monkeypatch, tmp_path):
     calls = {}
 
     def fake_run_plot_only(args):
-        calls["plot_trend_window"] = getattr(args, "plot_trend_window", None)
+        calls["plot_moving_average_window"] = getattr(args, "plot_moving_average_window", None)
 
     monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
 
     api_mod.plot_only(
         mode="wris",
         output_dir=str(tmp_path),
-        plot_trend_window=True,
+        moving_average=True,
     )
 
-    assert calls["plot_trend_window"] == 30
+    assert calls["plot_moving_average_window"] == 30
 
 
 # ============================================================
@@ -1160,3 +1160,4 @@ def test_package_help_prints_python_api_menu(capsys):
     assert "swift.wris.download" in out
     assert "swift.fetch(table, ...)" in out
     assert "swift.cli_help()" in out
+

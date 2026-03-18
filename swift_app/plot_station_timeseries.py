@@ -95,9 +95,13 @@ def plot_station(
     include_images_subdir=True,
     export_png=None,
     export_svg=False,
-    trend_window=None,
+    moving_average_window=None,
 ):
-    """Plot one SWIFT station file to high-resolution PNG and/or SVG."""
+    """Plot one SWIFT station file to high-resolution PNG and/or SVG.
+
+    The optional overlay is a moving average computed over the provided
+    sample window, not a fitted trendline.
+    """
     file_path = Path(file_path)
     try:
         if export_png is None:
@@ -122,10 +126,20 @@ def plot_station(
 
         ax.plot(df["time"], df["value"], color="#1f4e79", linewidth=1.4, alpha=0.85, label="Observed")
 
-        if trend_window and int(trend_window) > 1:
-            rolling = df["value"].rolling(int(trend_window), min_periods=max(2, int(trend_window)//3)).mean()
+        if moving_average_window and int(moving_average_window) > 1:
+            rolling = df["value"].rolling(
+                int(moving_average_window),
+                min_periods=max(2, int(moving_average_window) // 3),
+            ).mean()
             if rolling.notna().any():
-                ax.plot(df["time"], rolling, color="#c1121f", linewidth=1.8, alpha=0.9, label=f"Moving Average - {int(trend_window)}")
+                ax.plot(
+                    df["time"],
+                    rolling,
+                    color="#c1121f",
+                    linewidth=1.8,
+                    alpha=0.9,
+                    label=f"Moving Average - {int(moving_average_window)}",
+                )
 
         ax.set_xlabel("Date", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
