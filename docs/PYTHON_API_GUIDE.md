@@ -161,7 +161,8 @@ Merge previously downloaded station files into GeoPackage outputs.
 Generate publication-ready hydrograph plots from existing output directories.
 
 Optional quality controls:
-- `plot_trend_window`: overlay moving-average trendline
+- `moving_average`: enable the moving-average overlay (`True` uses the default 30-sample window)
+- `window`: set the moving-average window size explicitly
 - `plot_svg=True`: export vector SVG alongside PNG
 
 ---

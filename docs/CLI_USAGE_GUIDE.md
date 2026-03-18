@@ -70,7 +70,7 @@ Common download controls:
 --merge
 --plot
 --plot-svg
---plot-trend-window N
+--plot-moving-average-window N
 --quiet
 ```
 
@@ -120,7 +120,7 @@ swift --merge-only --input-dir output --output-dir output
 ### Plot-only mode
 
 ```bash
-swift --plot-only --input-dir output --plot-trend-window 30 --plot-svg
+swift --plot-only --input-dir output --plot-moving-average-window 30 --plot-svg
 ```
 
 ---

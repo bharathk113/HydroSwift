@@ -80,7 +80,7 @@ def test_cli_parser_plot_quality_flags():
     from swift_app.cli import build_parser
 
     parser = build_parser()
-    args = parser.parse_args(["--plot-only", "--input-dir", "output", "--plot-svg", "--plot-trend-window", "30"])
+    args = parser.parse_args(["--plot-only", "--input-dir", "output", "--plot-svg", "--plot-moving-average-window", "30"])
 
     assert args.plot_svg is True
-    assert args.plot_trend_window == 30
+    assert args.plot_moving_average_window == 30

@@ -135,7 +135,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also export publication-ready SVG files when plotting",
     )
     output.add_argument(
-        "--plot-trend-window",
+        "--plot-moving-average-window",
         type=int,
         default=None,
         help="Optional moving-average window (number of samples) overlay for plots",

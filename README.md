@@ -170,7 +170,7 @@ Merge downloaded station datasets into a GeoPackage:
 
 Generate publication-ready plots from downloaded data:
 
-    swift --plot-only --input-dir output --plot-trend-window 30 --plot-svg
+    swift --plot-only --input-dir output --plot-moving-average-window 30 --plot-svg
 
 Run silently (no console UI):
 

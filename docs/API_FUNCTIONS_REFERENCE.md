@@ -25,7 +25,7 @@ See also: [Python API Guide](./PYTHON_API_GUIDE.md) and [CLI Usage Guide](./CLI_
 | `swift.cwc.reconcile_metadata` | Reconcile packaged CWC metadata using `name-code.csv` and live lookups. | `write=False` |
 | `swift.fetch` | Generic table-driven downloader for WRIS/CWC station or basin tables. | `stations` (DataFrame/SwiftTable), `output_dir="output"`, `start_date="1950-01-01"`, `end_date=None`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `delay=0.25`, `refresh=False` |
 | `swift.merge_only` | Merge downloaded station files into GeoPackages. | `input_dir=None`, `output_dir=None`, `mode=None`, `variable=None` |
-| `swift.plot_only` | Plot from existing downloaded files. | `input_dir=None`, `output_dir=None`, `cwc=False`, `mode=None`, `variable=None`, `plot_svg=False`, `plot_trend_window=None` |
+| `swift.plot_only` | Plot from existing downloaded files. | `input_dir=None`, `output_dir=None`, `cwc=False`, `mode=None`, `variable=None`, `plot_svg=False`, `moving_average=None`, `window=None` |
 | `swift.help` / `swift.cli_help` | Print Python API help (`help`) or CLI help (`cli_help`) from Python. | (none) |
 | `swift.cite` | Print citation text. | (none) |
 | `swift.coffee` | Print coffee-break banner. | (none) |

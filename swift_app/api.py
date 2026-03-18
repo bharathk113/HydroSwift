@@ -252,7 +252,7 @@ def _build_args(**kwargs):
     args.format = kwargs.get("format", "csv")
     args.plot = kwargs.get("plot", False)
     args.plot_svg = kwargs.get("plot_svg", False)
-    args.plot_trend_window = kwargs.get("plot_trend_window")
+    args.plot_moving_average_window = kwargs.get("plot_moving_average_window")
     args.metadata = kwargs.get("metadata", False)
     args.quiet = kwargs.get("quiet", False)
     args.cwc = kwargs.get("cwc", False)
@@ -2037,8 +2037,8 @@ def plot_only(
     mode=None,
     variable=None,
     plot_svg=False,
-    plot_trend_window=None,
-    trend_window=None,
+    moving_average=None,
+    window=None,
 ):
     """
     Generate hydrograph plots from existing SWIFT output.
@@ -2060,6 +2060,12 @@ def plot_only(
         Data source mode.
     variable : str or list[str], optional
         Subset of variables to plot (WRIS only; e.g. ``["solar", "discharge"]``).
+    moving_average : bool | int, optional
+        Enable moving-average overlay. Pass ``True`` to use the default
+        30-sample window or pass an integer window size directly.
+    window : int, optional
+        Moving-average window size in samples. Preferred companion to
+        ``moving_average=True``.
     """
     _var_list = (
         [] if variable is None
@@ -2089,17 +2095,13 @@ def plot_only(
     if not p.exists():
         raise ValueError("input_dir does not exist")
 
-    # Accept both modern and legacy trendline argument styles:
-    # - trend_window=30
-    # - plot_trend_window=30
-    # - plot_trend_window=True with trend_window=30
-    resolved_trend_window = None
-    if trend_window is not None:
-        resolved_trend_window = trend_window
-    elif isinstance(plot_trend_window, bool):
-        resolved_trend_window = 30 if plot_trend_window else None
-    elif plot_trend_window is not None:
-        resolved_trend_window = plot_trend_window
+    resolved_moving_average_window = None
+    if window is not None:
+        resolved_moving_average_window = window
+    elif isinstance(moving_average, bool):
+        resolved_moving_average_window = 30 if moving_average else None
+    elif moving_average is not None:
+        resolved_moving_average_window = moving_average
 
     args = _build_args(
         input_dir=str(p),
@@ -2108,7 +2110,7 @@ def plot_only(
         dataset_flags=dataset_flags,
         cwc=cwc,
         plot_svg=plot_svg,
-        plot_trend_window=resolved_trend_window,
+        plot_moving_average_window=resolved_moving_average_window,
     )
     run_plot_only(args)
     return None

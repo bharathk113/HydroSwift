@@ -5,7 +5,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def test_plot_station_generates_svg_only_with_trend_when_requested(tmp_path):
+def test_plot_station_generates_svg_only_with_moving_average_when_requested(tmp_path):
     pytest.importorskip("matplotlib")
     import pandas as pd
     from swift_app.plot_station_timeseries import plot_station
@@ -28,7 +28,7 @@ def test_plot_station_generates_svg_only_with_trend_when_requested(tmp_path):
         image_root=str(tmp_path),
         include_images_subdir=True,
         export_svg=True,
-        trend_window=3,
+        moving_average_window=3,
     )
 
     out_png = tmp_path / "wris" / "krishna" / "images" / "discharge" / "station_001.png"
