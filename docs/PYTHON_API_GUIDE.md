@@ -1,67 +1,123 @@
-# SWIFT Python API Guide (Comprehensive)
+# Python API Guide
 
-This guide documents the stable Python API exposed by:
+This guide documents the current Python API exposed by:
 
 ```python
-import swift_app as swift
+import hydroswift as swift
 ```
 
+It reflects the implementation in `hydroswift.api` and the workflows demonstrated in `PYTHON_API_EXAMPLES.ipynb`.
+
+## 1. Core API model
+
+HydroSwift has two complementary Python workflows.
+
+### A. Explicit download workflow
+
+Use the source-specific namespaces when you already know your inputs.
+
+- `swift.wris.download(...)`
+- `swift.cwc.download(...)`
+
+### B. Table-driven workflow
+
+Use helper methods to discover basins/stations, then pass the resulting table to:
+
+- `swift.fetch(...)`
+
+This is the workflow most emphasized by the example notebook because it is reproducible and lets you inspect metadata before downloading.
+
 ---
 
-## 1) API design in one minute
-
-SWIFT intentionally uses **two complementary download styles**:
-
-1. **Explicit namespace downloads**
-   - `swift.wris.download(...)`
-   - `swift.cwc.download(...)`
-   - Best when you already know basin/station/variables.
-
-2. **Table-driven generic downloads**
-   - `swift.fetch(table, ...)`
-   - Best when you discover stations/basins first and then download from those tables.
-
-> Important: namespace download methods accept explicit values only; DataFrame/SwiftTable inputs should be passed to `swift.fetch(...)`.
-
----
-
-## 2) WRIS API
+## 2. WRIS namespace
 
 ### `swift.wris.variables()`
-Returns a table of supported WRIS variables and aliases.
+
+Returns a `SwiftTable` describing the WRIS variables supported by HydroSwift.
+
+Columns include:
+
+- `flag`
+- `dataset_code`
+- `folder`
+- `canonical_name`
+- `aliases`
+
+Example:
 
 ```python
-vars_df = swift.wris.variables()
+swift.wris.variables()
 ```
 
+Supported canonical variables currently map to these CLI/API names:
+
+- `discharge`
+- `water_level`
+- `atm_pressure`
+- `rainfall`
+- `temperature`
+- `humidity`
+- `solar_radiation`
+- `sediment`
+- `groundwater_level`
+
 ### `swift.wris.basins(variable=None)`
-Returns WRIS basin table.
+
+Returns a WRIS basin table.
+
+#### Without `variable`
+
+You get one row per basin.
 
 ```python
 basins = swift.wris.basins()
-basin_var_pairs = swift.wris.basins(variable=["discharge", "rainfall"])
 ```
 
-If `variable` is provided, the table is fetch-ready for basin-level dispatch.
+#### With `variable`
 
-### `swift.wris.stations(basin, variable, delay=0.25)`
-Discovers station metadata for one or multiple basin/variable combinations.
+You get one row per `(basin, variable)` pair, which makes the table directly usable with `swift.fetch(...)`.
+
+```python
+basins = swift.wris.basins(variable=["sediment", "water_level"])
+```
+
+This pattern is shown in the Python examples notebook.
+
+### `swift.wris.stations(basin, variable, delay=0.25, state=None)`
+
+Discovers WRIS station metadata for one or more basin/variable combinations.
 
 ```python
 stations = swift.wris.stations(
-    basin=["Godavari", "Krishna"],
-    variable=["discharge", "solar"],
+    basin=["Godavari", "Narmada"],
+    variable=["solar", "sediment"],
 )
 ```
 
+Notes:
+
+- `variable` is required.
+- `state` is **not supported** for WRIS station filtering; passing it raises a `ValueError`.
+- The returned table includes `source/type` metadata in `.attrs`, which `swift.fetch(...)` uses later.
+
+Typical columns include:
+
+- `station_code`
+- `station_name`
+- `latitude`
+- `longitude`
+- `river`
+- `basin`
+- `variable`
+
 ### `swift.wris.download(...)`
-Explicit WRIS download.
+
+Use this for explicit WRIS downloads.
 
 ```python
 gdf = swift.wris.download(
-    basin="Krishna",
-    variable=["discharge", "rainfall"],
-    station=None,
+    basin=["Krishna", "Tapi"],
+    variable=["discharge", "solar"],
     start_date="2024-01-01",
     end_date="2024-03-31",
     output_dir="output",
@@ -74,37 +130,75 @@ gdf = swift.wris.download(
 )
 ```
 
-Parameters:
-- `basin`: str|int|list
-- `variable`: str|list
-- `station` / `stations`: optional station code(s)
-- common controls: `start_date`, `end_date`, `output_dir`, `format`, `overwrite`, `merge`, `plot`, `quiet`
+Key points:
+
+- `basin` is required.
+- `variable` is required.
+- `station` and `stations` are aliases; provide only one of them.
+- Inputs must be explicit strings/ints/lists, **not DataFrames**.
+- Basin values may be names like `"Krishna"` or WRIS numeric basin IDs such as `6`.
+
+Example with station filtering:
+
+```python
+swift.wris.download(
+    basin="Godavari",
+    variable="discharge",
+    station=["SOME_STATION_CODE"],
+)
+```
 
 ---
 
-## 3) CWC API
+## 3. CWC namespace
 
-### `swift.cwc.stations(...)`
-Returns CWC station metadata table with optional filters.
+CWC support is focused on **water-level** time series and metadata.
+
+### `swift.cwc.stations(station=None, basin=None, river=None, state=None, refresh=False)`
+
+Returns CWC station metadata.
 
 ```python
-cwc_stns = swift.cwc.stations(basin=["Krishna", "Godavari"], state="Telangana")
+stations = swift.cwc.stations(
+    basin=["Narmada", "Tapi"],
+    state=["Gujarat", "Maharashtra"],
+)
 ```
+
+Filters can be combined.
+
+Common columns include:
+
+- `code`
+- `name`
+- `basin`
+- `river`
+- `state`
+
+`refresh=True` tells HydroSwift to refresh metadata from the live CWC API first, then apply filters.
 
 ### `swift.cwc.basins(refresh=False)`
-Returns basin summary from CWC station metadata.
+
+Builds a basin summary table from the CWC station metadata.
 
 ```python
-cwc_basins = swift.cwc.basins()
+basins = swift.cwc.basins()
 ```
 
+Returned columns:
+
+- `basin`
+- `station_count`
+
+This table is fetch-ready for basin-driven CWC download dispatch.
+
 ### `swift.cwc.download(...)`
-Explicit CWC download.
+
+Use this for explicit CWC downloads.
 
 ```python
 gdf = swift.cwc.download(
-    station=["040-CDJAPR", "032-LGDHYD"],
-    basin=["Krishna"],
+    basin=["Narmada", "Tapi"],
     start_date="2024-01-01",
     end_date="2024-01-07",
     output_dir="output",
@@ -117,73 +211,216 @@ gdf = swift.cwc.download(
 )
 ```
 
-Notes:
-- CWC provides water-level data.
-- If both `station` and `basin` are provided, SWIFT uses intersection behavior.
-
-### `swift.cwc.reconcile_metadata(write=False)`
-Reconciles missing station codes from `name-code.csv` via live lookups.
-
----
-
-## Metadata behavior (WRIS vs CWC)
-
-- **WRIS metadata is fetched on request** during station discovery/download workflows.
-- **CWC metadata is packaged by default** (and optionally cached/refreshed) to reduce API calls because station metadata is mostly static and typically changes only when HFL-related metadata updates occur.
-- For CWC, `refresh=True` fetches fresh metadata first and then applies filters (for example `basin="Krishna"`) on that refreshed dataset.
-
----
-
-## 4) Unified download: `swift.fetch(table, ...)`
-
-Use this when input is a station/basin table from SWIFT helper methods.
+Or download specific stations:
 
 ```python
-# WRIS station table -> download
-wris_tbl = swift.wris.stations(basin="Krishna", variable="discharge")
-swift.fetch(wris_tbl, start_date="2024-01-01", end_date="2024-01-10", merge=True)
-
-# CWC basin table -> dispatch by basin
-cwc_basin_tbl = swift.cwc.basins().head(2)
-swift.fetch(cwc_basin_tbl, start_date="2024-01-01", end_date="2024-01-10")
+swift.cwc.download(
+    station=["040-CDJAPR", "032-LGDHYD"],
+    start_date="2024-01-01",
+    end_date="2024-01-07",
+)
 ```
 
-`fetch(...)` auto-detects WRIS vs CWC and station-vs-basin table shapes.
+Behavior notes:
+
+- `station` is optional.
+- `basin` is optional.
+- If both are provided, HydroSwift downloads the intersection.
+- Table-like inputs should go to `swift.fetch(...)`, not `swift.cwc.download(...)`.
+- Internal parameters like `_name_by` and `_gpkg_group` exist for internal dispatch; they are not normal user-facing API controls.
+
+### `swift.cwc.reconcile_metadata(write=False)`
+
+Reconciles packaged CWC metadata with `name-code.csv` using live lookups.
+
+```python
+meta = swift.cwc.reconcile_metadata(write=False)
+```
+
+This is a metadata maintenance helper, not part of the common download path.
 
 ---
 
-## 5) Post-processing helpers
+## 4. Unified table-driven downloads with `swift.fetch(...)`
 
-### `swift.merge_only(...)`
-Merge previously downloaded station files into GeoPackage outputs.
+`swift.fetch(...)` is the main bridge between metadata discovery tables and actual downloads.
+
+```python
+swift.fetch(
+    stations,
+    output_dir="output",
+    start_date="2024-01-01",
+    end_date="2024-01-10",
+    merge=True,
+)
+```
+
+### Acceptable inputs
+
+Use tables returned by:
+
+- `swift.wris.stations(...)`
+- `swift.wris.basins(variable=...)`
+- `swift.cwc.stations(...)`
+- `swift.cwc.basins(...)`
+
+### WRIS behavior
+
+`fetch(...)` supports both:
+
+- **station-level WRIS tables** with `station_code`
+- **basin-level WRIS tables** with basin/variable combinations
+
+Examples from the notebook:
+
+```python
+basins_wris = swift.wris.basins(variable=["sediment", "water_level"])
+subset = basins_wris[basins_wris["basin"].isin(["Cauvery", "Godavari"])]
+result = swift.fetch(subset, output_dir="data_fetch_wris", start_date="2024-04-01")
+```
+
+```python
+stations = swift.wris.stations(basin=["Godavari", "Narmada"], variable=["solar", "sediment"])
+result = swift.fetch(stations, output_dir="data_fetch_wris", start_date="2024-04-01")
+```
+
+### CWC behavior
+
+`fetch(...)` supports both:
+
+- **station-level CWC tables** with `code`
+- **basin-level CWC tables** from `swift.cwc.basins()`
+
+Examples from the notebook:
+
+```python
+basins_cwc = swift.cwc.basins()
+subset = basins_cwc[basins_cwc["basin"].isin(["Narmada", "Tapi"])]
+result = swift.fetch(subset, output_dir="data_fetch_cwc", start_date="2024-04-01")
+```
+
+```python
+stations_cwc = swift.cwc.stations(basin=["Narmada", "Tapi"], state=["Gujarat", "Maharashtra"])
+subset = stations_cwc[stations_cwc["name"].isin(["BODELI", "Bharuch"])]
+result = swift.fetch(subset, output_dir="data_fetch_cwc", start_date="2024-04-01")
+```
+
+### Parameters shared across fetch workflows
+
+- `output_dir`
+- `start_date`
+- `end_date`
+- `format`
+- `overwrite`
+- `merge`
+- `plot`
+- `quiet`
+- `delay` for WRIS dispatch
+- `refresh` for CWC metadata refresh before dispatch
+
+---
+
+## 5. Post-processing helpers
+
+### `swift.merge_only(input_dir=None, output_dir=None, *, mode=None, variable=None)`
+
+Merges previously downloaded files into GeoPackages.
+
+Examples from the notebook:
+
+```python
+swift.merge_only(
+    mode="cwc",
+    input_dir="data_fetch_cwc",
+    output_dir="merged_cwc",
+)
+```
+
+```python
+swift.merge_only(
+    mode="wris",
+    input_dir="data_fetch_wris",
+    output_dir="merged_wris",
+    variable=["sediment", "water_level"],
+)
+```
+
+Notes:
+
+- `mode` may be `"wris"` or `"cwc"`.
+- `variable` applies only to WRIS; CWC ignores it.
+- If `output_dir` is omitted, the function attempts an in-memory merge path.
 
 ### `swift.plot_only(...)`
-Generate publication-ready hydrograph plots from existing output directories.
 
-Optional quality controls:
-- `moving_average`: enable the moving-average overlay (`True` uses the default 30-sample window)
-- `window`: set the moving-average window size explicitly
-- `plot_svg=True`: export vector SVG alongside PNG
+Builds plots from existing HydroSwift outputs.
+
+Notebook-aligned examples:
+
+```python
+swift.plot_only(
+    mode="cwc",
+    input_dir="data_fetch_cwc",
+    output_dir="plots_cwc",
+    plot_svg=False,
+)
+```
+
+```python
+swift.plot_only(
+    mode="wris",
+    input_dir="data_fetch_wris",
+    output_dir="plots_wris",
+    variable=["sediment", "water_level"],
+    plot_svg=True,
+)
+```
+
+Important parameters:
+
+- `mode="wris"` or `mode="cwc"`
+- `plot_svg`
+- `moving_average`
+- `window`
+
+`moving_average=True` uses the default 30-sample window unless `window` is set.
 
 ---
 
-## 6) Utilities
+## 6. Utility helpers
 
-- `swift.help()` → print Python API help in Python context.
-- `swift.cli_help()` → print CLI help (equivalent to `swift -h`) in Python context.
-- `swift.cite()` → print citation text.
-- `swift.coffee()` → utility banner/easter egg.
+### `swift.help()`
+
+Prints the Python API help text.
+
+### `swift.cli_help()`
+
+Prints the CLI parser help from Python.
+
+### `swift.cite()`
+
+Prints the citation text.
+
+### `swift.coffee()`
+
+Prints the coffee easter egg.
 
 ---
 
-## 7) Recommended workflows
+## 7. Practical workflow recommendations
 
-### Workflow A: direct known request
-1. Call `swift.wris.download(...)` or `swift.cwc.download(...)`
-2. Set `merge=True` when you want in-memory merged results.
+### Recommended workflow for notebooks
 
-### Workflow B: discover then fetch
-1. Use `wris.stations`, `wris.basins`, `cwc.stations`, or `cwc.basins`
-2. Pass resulting table to `swift.fetch(...)`
+1. Discover metadata with `swift.wris.stations(...)`, `swift.wris.basins(...)`, `swift.cwc.stations(...)`, or `swift.cwc.basins(...)`.
+2. Inspect and subset the returned table.
+3. Pass that table into `swift.fetch(...)`.
+4. Use `swift.merge_only(...)` or `swift.plot_only(...)` later if you deliberately disabled `merge` or `plot` during fetch.
 
-This pattern is best for reproducible notebook pipelines.
+### Recommended workflow for short scripts
+
+Use explicit downloads when you already know the exact basin/station inputs:
+
+- `swift.wris.download(...)`
+- `swift.cwc.download(...)`
+
+This avoids the discovery step.

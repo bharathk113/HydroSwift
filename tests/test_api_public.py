@@ -1156,7 +1156,7 @@ def test_package_help_prints_python_api_menu(capsys):
     swift_app.help()
     out = capsys.readouterr().out
 
-    assert "SWIFT Python API help" in out
+    assert "HydroSwift Python API help" in out
     assert "swift.wris.download" in out
     assert "swift.fetch(table, ...)" in out
     assert "swift.cli_help()" in out

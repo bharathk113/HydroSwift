@@ -1,7 +1,7 @@
-site_name: SWIFT Documentation
-site_description: Simple Water Information Fetch Tool (SWIFT)
-repo_url: https://github.com/carbform/swift
-repo_name: carbform/swift
+site_name: HydroSwift Documentation
+site_description: Fast, unified workflows for hydrological data
+repo_url: https://github.com/carbform/HydroSwift
+repo_name: carbform/HydroSwift
 edit_uri: edit/main/docs/
 
 theme:
@@ -74,5 +74,4 @@ nav:
   - CLI Usage Guide: CLI_USAGE_GUIDE.md
   - API Functions Reference: API_FUNCTIONS_REFERENCE.md
   - Public API and CLI Map: PUBLIC_API_AND_CLI.md
-  - CLI Examples Notebook: CLI_EXAMPLES.ipynb
-  - Python API Examples Notebook: PYTHON_API_EXAMPLES.ipynb
+  - Examples and Notebooks: EXAMPLES_AND_NOTEBOOKS.md

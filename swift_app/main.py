@@ -48,7 +48,7 @@ def _print_coffee() -> None:
 
 
 def main() -> int:
-    """Main SWIFT execution entry point."""
+    """Main HydroSwift execution entry point."""
 
     import os
     import sys
@@ -63,6 +63,7 @@ def main() -> int:
 
     parser = build_parser()
     args = parser.parse_args()
+    args.interface = "cli"
 
     def is_valid_basin_folder(folder: Path):
 
@@ -251,10 +252,10 @@ def main() -> int:
 
     if args.cite:
         print("""
-        If you use SWIFT in your research, please consider citing:
+        If you use HydroSwift in your research, please consider citing:
 
         Sarat, C., Dash, D., & Kumar, A. (2026).
-        SWIFT: Automated Retrieval of Hydrological Station Data
+        HydroSwift: Automated Retrieval of Hydrological Station Data
         from India-WRIS and CWC Portals.
         Journal of Open Source Software.
 
