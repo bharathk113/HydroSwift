@@ -2038,6 +2038,7 @@ def plot_only(
     variable=None,
     plot_svg=False,
     plot_trend_window=None,
+    trend_window=None,
 ):
     """
     Generate hydrograph plots from existing SWIFT output.
@@ -2087,6 +2088,19 @@ def plot_only(
     p = Path(input_dir)
     if not p.exists():
         raise ValueError("input_dir does not exist")
+
+    # Accept both modern and legacy trendline argument styles:
+    # - trend_window=30
+    # - plot_trend_window=30
+    # - plot_trend_window=True with trend_window=30
+    resolved_trend_window = None
+    if trend_window is not None:
+        resolved_trend_window = trend_window
+    elif isinstance(plot_trend_window, bool):
+        resolved_trend_window = 30 if plot_trend_window else None
+    elif plot_trend_window is not None:
+        resolved_trend_window = plot_trend_window
+
     args = _build_args(
         input_dir=str(p),
         output_dir=str(output_dir) if output_dir else None,
@@ -2094,7 +2108,7 @@ def plot_only(
         dataset_flags=dataset_flags,
         cwc=cwc,
         plot_svg=plot_svg,
-        plot_trend_window=plot_trend_window,
+        plot_trend_window=resolved_trend_window,
     )
     run_plot_only(args)
     return None

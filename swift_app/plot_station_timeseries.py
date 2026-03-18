@@ -93,12 +93,16 @@ def plot_station(
     file_path,
     image_root=None,
     include_images_subdir=True,
+    export_png=None,
     export_svg=False,
     trend_window=None,
 ):
-    """Plot one SWIFT station file to high-resolution PNG (+optional SVG)."""
+    """Plot one SWIFT station file to high-resolution PNG and/or SVG."""
     file_path = Path(file_path)
     try:
+        if export_png is None:
+            export_png = not export_svg
+
         df = load_swift_file(file_path)
         if df is None:
             print("Skipping (missing columns):", file_path.name)
@@ -121,7 +125,7 @@ def plot_station(
         if trend_window and int(trend_window) > 1:
             rolling = df["value"].rolling(int(trend_window), min_periods=max(2, int(trend_window)//3)).mean()
             if rolling.notna().any():
-                ax.plot(df["time"], rolling, color="#c1121f", linewidth=1.8, alpha=0.9, label=f"{int(trend_window)}-step mean")
+                ax.plot(df["time"], rolling, color="#c1121f", linewidth=1.8, alpha=0.9, label=f"Moving Average - {int(trend_window)}")
 
         ax.set_xlabel("Date", fontsize=10)
         ax.set_ylabel(ylabel, fontsize=10)
@@ -164,12 +168,20 @@ def plot_station(
             ax.legend(frameon=False, loc="upper left")
 
         out_dir.mkdir(parents=True, exist_ok=True)
-        png_path = out_dir / f"{prefix}{file_path.stem}.png"
-        fig.savefig(png_path, dpi=300)
+        saved_paths = []
+        if export_png:
+            png_path = out_dir / f"{prefix}{file_path.stem}.png"
+            fig.savefig(png_path, dpi=300)
+            saved_paths.append(str(png_path))
         if export_svg:
-            fig.savefig(out_dir / f"{prefix}{file_path.stem}.svg")
+            svg_path = out_dir / f"{prefix}{file_path.stem}.svg"
+            fig.savefig(svg_path)
+            saved_paths.append(str(svg_path))
         plt.close(fig)
-        print("Saved:", png_path)
+        if saved_paths:
+            print("Saved:", ", ".join(saved_paths))
+        else:
+            print("Skipped (no export format enabled):", file_path.name)
     except Exception as e:
         print("Failed:", file_path.name, "|", str(e))
 

@@ -5,7 +5,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def test_plot_station_generates_png_and_svg_with_trend(tmp_path):
+def test_plot_station_generates_svg_only_with_trend_when_requested(tmp_path):
     pytest.importorskip("matplotlib")
     import pandas as pd
     from swift_app.plot_station_timeseries import plot_station
@@ -34,5 +34,5 @@ def test_plot_station_generates_png_and_svg_with_trend(tmp_path):
     out_png = tmp_path / "wris" / "krishna" / "images" / "discharge" / "station_001.png"
     out_svg = tmp_path / "wris" / "krishna" / "images" / "discharge" / "station_001.svg"
 
-    assert out_png.exists()
+    assert not out_png.exists()
     assert out_svg.exists()

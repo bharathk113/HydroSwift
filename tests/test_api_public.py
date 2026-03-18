@@ -998,6 +998,49 @@ def test_plot_only_input_dir_must_exist(tmp_path):
         )
 
 
+def test_plot_only_accepts_trend_window_alias(monkeypatch, tmp_path):
+    import swift_app.api as api_mod
+
+    (tmp_path / "wris" / "krishna").mkdir(parents=True)
+
+    calls = {}
+
+    def fake_run_plot_only(args):
+        calls["plot_trend_window"] = getattr(args, "plot_trend_window", None)
+
+    monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
+
+    api_mod.plot_only(
+        mode="wris",
+        output_dir=str(tmp_path),
+        plot_trend_window=True,
+        trend_window=30,
+    )
+
+    assert calls["plot_trend_window"] == 30
+
+
+def test_plot_only_bool_trend_window_defaults_to_30(monkeypatch, tmp_path):
+    import swift_app.api as api_mod
+
+    (tmp_path / "wris" / "krishna").mkdir(parents=True)
+
+    calls = {}
+
+    def fake_run_plot_only(args):
+        calls["plot_trend_window"] = getattr(args, "plot_trend_window", None)
+
+    monkeypatch.setattr(api_mod, "run_plot_only", fake_run_plot_only)
+
+    api_mod.plot_only(
+        mode="wris",
+        output_dir=str(tmp_path),
+        plot_trend_window=True,
+    )
+
+    assert calls["plot_trend_window"] == 30
+
+
 # ============================================================
 # Package-level namespace access
 # ============================================================
