@@ -41,6 +41,29 @@ class Console:
             print(f"{Console.GREEN}{Console.BOLD}{msg}{Console.RESET}")
 
 
+
+
+def get_interface(args) -> str:
+    """Return the user-facing interface context for runtime messaging."""
+    interface = getattr(args, "interface", None)
+    if interface in {"cli", "python"}:
+        return interface
+    return "cli"
+
+
+def overwrite_tip(args) -> str:
+    """Return an overwrite hint suitable for the active interface."""
+    if get_interface(args) == "python":
+        return "Tip: call with overwrite=True to refresh data."
+    return "Tip: re-run with --overwrite to refresh data."
+
+
+def coffee_tip(args) -> str:
+    """Return a long-run hint suitable for the active interface."""
+    if get_interface(args) == "python":
+        return "Tip: call swift.coffee() before a long run ☕"
+    return "Tip: enable --coffee mode for long runs ☕"
+
 class Logger:
     """Append-only file logger for download sessions."""
 

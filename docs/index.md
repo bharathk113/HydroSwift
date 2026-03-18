@@ -1,88 +1,75 @@
-# SWIFT 🌊
-### Simple Water Information Fetch Tool
+# HydroSwift ⚡
 
-**SWIFT** provides a unified Python API and CLI for accessing
-Indian hydrology datasets from **WRIS** and **CWC**.
+HydroSwift is a unified toolkit for hydrological data integration, analysis, and visualization.
 
-<div class="grid cards" markdown>
+Designed for fast, reproducible basin-scale workflows.
 
-- :material-language-python: **Python API**
+HydroSwift currently downloads hydrology data from two sources:
 
-  Discover stations, query basins, and download time-series data
-  using a clean Python interface.
+- **India-WRIS** for multiple hydrological variables such as discharge, rainfall, temperature, humidity, sediment, groundwater level, solar radiation, atmospheric pressure, and water level.
+- **CWC Flood Forecasting System** for **water-level** station data.
 
-  [Python API Guide](PYTHON_API_GUIDE.md)
+This documentation has been rewritten to match the current codebase and the example workflows shown in:
 
-- :material-console: **Command Line Interface**
+- `PYTHON_API_EXAMPLES.ipynb` / `PYTHON_API_EXAMPLES.html`
+- `SWIFT_CLI_BEGINNER.ipynb` / `SWIFT_CLI_BEGINNER.html`
 
-  Reproducible data downloads directly from the terminal.
+## How HydroSwift is organized
 
-  [CLI Usage Guide](CLI_USAGE_GUIDE.md)
+HydroSwift exposes two main interfaces:
 
-- :material-function: **API Reference**
+1. **Python API** via `import hydroswift as swift`
+2. **CLI** via `swift ...` or `python -m hydroswift ...`
 
-  Complete reference of all public SWIFT functions.
+The Python API has two styles:
 
-  [API Functions Reference](API_FUNCTIONS_REFERENCE.md)
+- **Explicit namespace downloads** for when you already know the basin/station values you want.
+- **Table-driven workflows** for when you first discover basins or stations, then pass those tables into `swift.fetch(...)`.
 
-- :material-notebook-outline: **Interactive Examples**
+## Recommended reading order
 
-  Run SWIFT workflows in Jupyter notebooks.
+- [Python API Guide](PYTHON_API_GUIDE.md) — concepts, workflows, and examples.
+- [CLI Usage Guide](CLI_USAGE_GUIDE.md) — every supported CLI flag and common command patterns.
+- [API Functions Reference](API_FUNCTIONS_REFERENCE.md) — signatures, parameter meanings, return shapes, and notes.
+- [Public API and CLI Map](PUBLIC_API_AND_CLI.md) — side-by-side mapping between notebook examples, Python, and CLI usage.
+- [Examples and Notebooks](EXAMPLES_AND_NOTEBOOKS.md) — where the example notebooks fit and what they demonstrate.
 
-  [Python API Examples](PYTHON_API_EXAMPLES.ipynb)
+## Quick start
 
-</div>
+### Python
 
----
+```python
+import hydroswift as swift
 
-## Quick example
+stations = swift.wris.stations(basin="Godavari", variable="discharge")
+result = swift.fetch(
+    stations,
+    output_dir="output",
+    start_date="2024-01-01",
+    end_date="2024-01-10",
+    merge=True,
+)
+```
 
-=== "Python"
+### CLI
 
-    ```python
-    import swift_app as swift
+```bash
+swift -b Godavari -q --start-date 2024-01-01 --end-date 2024-01-10 --merge
+```
 
-    df = swift.wris.download(
-        basin="Godavari",
-        variable="discharge",
-        start_date="2024-01-01",
-        end_date="2024-01-10",
-    )
-    ```
+## Important usage rules
 
-=== "CLI"
+- Use `swift.wris.download(...)` and `swift.cwc.download(...)` when you want to pass **explicit basin/station values**.
+- Use `swift.fetch(table, ...)` when your input comes from `swift.wris.stations(...)`, `swift.wris.basins(...)`, `swift.cwc.stations(...)`, or `swift.cwc.basins(...)`.
+- `swift.wris.download(...)` does **not** accept DataFrame inputs.
+- `swift.cwc.download(...)` does **not** accept DataFrame inputs.
+- CWC downloads are **water-level only**.
 
-    ```bash
-    swift -b Godavari -q \
-        --start-date 2024-01-01 \
-        --end-date 2024-01-10
-    ```
+## Output model
 
----
+HydroSwift writes downloaded station files under an output directory, then optionally:
 
-## Documentation structure
+- merges them into GeoPackages with `merge=True` or `swift.merge_only(...)`
+- creates plots with `plot=True` or `swift.plot_only(...)`
 
-| Guide | Description |
-|------|-------------|
-| **Python API Guide** | Complete Python usage documentation |
-| **CLI Usage Guide** | All command line options |
-| **API Functions Reference** | Function signatures and arguments |
-| **Public API and CLI Map** | Cross-reference of CLI ↔ Python |
-
----
-
-## Notebook examples
-
-- [CLI Examples Notebook](CLI_EXAMPLES.ipynb)
-- [Python API Examples Notebook](PYTHON_API_EXAMPLES.ipynb)
-
----
-
-## About SWIFT
-
-SWIFT provides:
-
-- programmatic access to **WRIS hydrology datasets**
-- automated downloads for **CWC water-level data**
-- reproducible CLI workflows
-- built-in plotting and merge utilities
+The post-processing helpers work from existing downloaded files and directory structure rather than requiring basin/station arguments again.

@@ -10,7 +10,7 @@ import pandas as pd
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from .utils import Console, Logger
+from .utils import Console, Logger, overwrite_tip
 from .wris import build_metadata
 
 # ---------------------------------------------------------
@@ -825,7 +825,7 @@ def download_station(station, output_dir, args):
         if args.format == "csv":
             # CSV: write a metadata preamble with "#" lines followed by
             # a compact timeseries table.
-            header_lines = ["# SWIFT Hydrological Timeseries"]
+            header_lines = ["# HydroSwift Hydrological Timeseries"]
             for key, value in meta_dict.items():
                 if value is not None and value != "":
                     header_lines.append(f"# {key}: {value}")
@@ -1022,7 +1022,7 @@ def run_cwc_download(args):
     if skipped > 0:
         Console.warn(f"Stations skipped (already downloaded): {skipped}")
         if not Console.is_quiet:
-            print(f"{Console.ITALIC}Tip: call with overwrite=True to refresh data.{Console.RESET}")
+            print(f"{Console.ITALIC}{overwrite_tip(args)}{Console.RESET}")
         logger.log("INFO", f"Skipped {skipped} existing stations")
 
     downloaded = 0

@@ -1,9 +1,9 @@
-# SWIFT
+# HydroSwift ⚡
 ![Tests](https://github.com/carbform/swift/actions/workflows/tests.yml/badge.svg)
 
-SWIFT — Simple Water Information Fetch Tool
+Fast, unified workflows for hydrological data.
 
-SWIFT is an open‑source Python command‑line tool for automated retrieval of hydrological station data from the India‑WRIS (https://indiawris.gov.in/) and Central Water Commission (CWC; https://ffs.india-water.gov.in/) portals.
+HydroSwift is a Python toolkit for integrating, processing, and visualizing hydrological datasets at basin scale. It automates retrieval from the India‑WRIS (https://indiawris.gov.in/) and Central Water Commission (CWC; https://ffs.india-water.gov.in/) portals while preserving reproducible CLI and notebook workflows.
 
 The software enables reproducible access to hydrological observations such as:
 
@@ -17,9 +17,19 @@ The software enables reproducible access to hydrological observations such as:
 - Groundwater levels
 - Suspended sediment
 
-SWIFT automates basin discovery, station enumeration, time‑series downloads, and dataset merging into geospatial formats.
+HydroSwift automates basin discovery, station enumeration, time‑series downloads, and dataset merging into geospatial formats.
 
 ------------------------------------------------------------
+
+## What is HydroSwift?
+
+HydroSwift enables:
+
+- Multi-source hydrology data ingestion across WRIS and CWC workflows
+- Dataset merging and harmonization
+- Basin-scale workflows
+- Visualization and analysis
+- Fast, reproducible pipelines for research and teaching
 
 FEATURES
 
@@ -50,28 +60,28 @@ Using pip (future release):
 ------------------------------------------------------------
 ## Quick Test
 
-After installation, verify SWIFT is working by running:
+After installation, verify HydroSwift is working by running:
 
-    python -m swift_app --help
-    python swift.py --version
+    python -m hydroswift --help
+    swift --version
 
-This should display the SWIFT command-line interface and available options.
+This should display the HydroSwift command-line interface and available options.
 
 ## Documentation
 
 - Python API guide: `docs/PYTHON_API_GUIDE.md`
 - CLI usage guide: `docs/CLI_USAGE_GUIDE.md`
-- CLI examples notebook: `docs/CLI_EXAMPLES.ipynb`
-- Python API examples notebook: `docs/PYTHON_API_EXAMPLES.ipynb`
+- CLI examples notebook: `SWIFT_CLI_BEGINNER.ipynb` / `SWIFT_CLI_BEGINNER.html`
+- Python API examples notebook: `PYTHON_API_EXAMPLES.ipynb` / `PYTHON_API_EXAMPLES.html`
 - API reference table: `docs/API_FUNCTIONS_REFERENCE.md`
 - Web docs build config: `mkdocs.yml` + `.readthedocs.yaml`
 
 ## Python API Usage
 
-SWIFT is primarily designed as a Python module for scripts and Jupyter notebooks.
+HydroSwift is primarily designed as a Python module for scripts and Jupyter notebooks.
 
 ```python
-import swift_app as swift
+import hydroswift as swift
 
 # Discover metadata tables
 wris_vars = swift.wris.variables()
@@ -130,7 +140,7 @@ swift.fetch(swift.cwc.basins().head(2), start_date="2024-01-01")
 
 ## Command Line Interface (CLI)
 
-SWIFT can also be used as a standalone command-line tool for rapid data acquisition without writing code.
+HydroSwift can also be used as a standalone command-line tool for rapid data acquisition without writing code.
 
 Download discharge observations for the Krishna basin:
 
@@ -201,7 +211,7 @@ Exact file names include date windows and dataset labels used during download.
 
 DATA SOURCES
 
-SWIFT retrieves publicly available data from:
+HydroSwift retrieves publicly available data from:
 
 - India Water Resources Information System (WRIS)
 - Central Water Commission (CWC) Flood Forecasting System
@@ -210,10 +220,10 @@ SWIFT retrieves publicly available data from:
 
 CITATION
 
-If you use SWIFT in your research, please cite:
+If you use HydroSwift in your research, please cite:
 
 Sarat, C., Dash, D., & Kumar, A. (2026).
-SWIFT: Automated Retrieval of Hydrological Station Data from India‑WRIS and CWC Portals.
+HydroSwift: Automated Retrieval of Hydrological Station Data from India‑WRIS and CWC Portals.
 Journal of Open Source Software.
 
 ------------------------------------------------------------

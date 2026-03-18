@@ -1,42 +1,192 @@
-# SWIFT — API functions reference
+# API Functions Reference
 
-All public functions in `swift_app` with the current supported signatures.
+This page lists the current public API exported by `import hydroswift as swift`.
 
-See also: [Python API Guide](./PYTHON_API_GUIDE.md) and [CLI Usage Guide](./CLI_USAGE_GUIDE.md).
+## Public entry points
+
+### WRIS namespace
+
+#### `swift.wris.variables()`
+
+Returns a WRIS variable lookup table.
+
+#### `swift.wris.basins(variable=None)`
+
+Returns a WRIS basin table.
+
+- `variable=None`: one row per basin
+- `variable='discharge'` or a list: one row per `(basin, variable)` pair
+
+#### `swift.wris.stations(basin, variable, delay=0.25, state=None)`
+
+Returns a WRIS station discovery table.
+
+Parameters:
+
+- `basin`: basin name, basin ID, or list of them
+- `variable`: WRIS variable name/flag or list of them
+- `delay`: delay between API requests in seconds
+- `state`: currently unsupported for WRIS filtering; non-empty values raise an error
+
+Returns a `SwiftTable` with station metadata and `.attrs` describing the source/table type.
+
+#### `swift.wris.download(basin=None, variable=None, *, station=None, stations=None, start_date='1950-01-01', end_date=None, output_dir='output', format='csv', overwrite=False, merge=False, plot=False, delay=0.25, quiet=False)`
+
+Downloads WRIS time series for explicit basin/variable inputs.
+
+Parameter notes:
+
+- `basin` is required.
+- `variable` is required.
+- `station` and `stations` are aliases; provide only one.
+- `format` is `csv` or `xlsx`.
+- `merge=True` merges station files after download.
+- `plot=True` generates plots after download.
+- `delay` controls pacing of WRIS API requests.
 
 ---
 
-## Public API (`import swift_app as swift`)
+### CWC namespace
 
-> Legacy migration:
-> - Removed: `swift.datasets`
-> - Removed: `swift.basins()`
-> - Use: `swift.wris.variables()`, `swift.wris.basins()`, `swift.cwc.basins()`
+#### `swift.cwc.stations(station=None, basin=None, river=None, state=None, refresh=False)`
 
-| Function / method | Description | Arguments |
-|---|---|---|
-| `swift.wris.download` | Download WRIS time-series data (explicit args only). | `basin` (str\|int\|list), `variable` (str\|list), `station=None`, `stations=None`, `start_date="1950-01-01"`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `delay=0.25`, `quiet=False` |
-| `swift.wris.stations` | Discover WRIS stations table for basin/variable combinations. | `basin` (str\|int\|list), `variable` (required str\|list), `delay=0.25`, `state=None` |
-| `swift.wris.variables` | WRIS variable/alias lookup table. | (none) |
-| `swift.wris.basins` | WRIS basin table; optional variable expansion for fetch-ready rows. | `variable=None` |
-| `swift.cwc.download` | Download CWC water-level data (explicit args only). | `station=None`, `basin=None`, `start_date=None`, `end_date=None`, `output_dir="output"`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `refresh=False` |
-| `swift.cwc.stations` | CWC station metadata table. | `station=None`, `basin=None`, `river=None`, `state=None`, `refresh=False` |
-| `swift.cwc.basins` | CWC basin summary table with station counts. | `refresh=False` |
-| `swift.cwc.reconcile_metadata` | Reconcile packaged CWC metadata using `name-code.csv` and live lookups. | `write=False` |
-| `swift.fetch` | Generic table-driven downloader for WRIS/CWC station or basin tables. | `stations` (DataFrame/SwiftTable), `output_dir="output"`, `start_date="1950-01-01"`, `end_date=None`, `format="csv"`, `overwrite=False`, `merge=False`, `plot=False`, `quiet=False`, `delay=0.25`, `refresh=False` |
-| `swift.merge_only` | Merge downloaded station files into GeoPackages. | `input_dir=None`, `output_dir=None`, `mode=None`, `variable=None` |
-| `swift.plot_only` | Plot from existing downloaded files. | `input_dir=None`, `output_dir=None`, `cwc=False`, `mode=None`, `variable=None`, `plot_svg=False`, `moving_average=None`, `window=None` |
-| `swift.help` / `swift.cli_help` | Print Python API help (`help`) or CLI help (`cli_help`) from Python. | (none) |
-| `swift.cite` | Print citation text. | (none) |
-| `swift.coffee` | Print coffee-break banner. | (none) |
+Returns CWC station metadata.
+
+Parameters:
+
+- `station`: station code or list of codes
+- `basin`: basin filter or list of basin filters
+- `river`: river filter
+- `state`: state filter or list of state filters
+- `refresh`: refresh station metadata from the live API before filtering
+
+#### `swift.cwc.basins(refresh=False)`
+
+Returns basin summary counts derived from CWC station metadata.
+
+Columns:
+
+- `basin`
+- `station_count`
+
+#### `swift.cwc.download(station=None, *, basin=None, start_date=None, end_date=None, output_dir='output', format='csv', overwrite=False, merge=False, plot=False, quiet=False, refresh=False, _name_by=None, _gpkg_group=None)`
+
+Downloads CWC water-level time series.
+
+Normal user-facing parameters are:
+
+- `station`
+- `basin`
+- `start_date`
+- `end_date`
+- `output_dir`
+- `format`
+- `overwrite`
+- `merge`
+- `plot`
+- `quiet`
+- `refresh`
+
+Notes:
+
+- CWC downloads are water-level only.
+- If both `station` and `basin` are provided, HydroSwift downloads only matching stations.
+- `_name_by` and `_gpkg_group` are internal dispatch parameters and should not be part of normal user code.
+
+#### `swift.cwc.reconcile_metadata(write=False)`
+
+Reconciles packaged metadata against `name-code.csv` using live lookups.
+
+- `write=False`: return the reconciled table only
+- `write=True`: also overwrite the packaged metadata file
 
 ---
 
-## Usage notes
+### Unified download helper
 
-- WRIS station metadata is fetched on request.
-- CWC station metadata defaults to packaged/cached data; use `refresh=True` to fetch live metadata before filters are applied.
+#### `swift.fetch(stations, *, output_dir='output', start_date='1950-01-01', end_date=None, format='csv', overwrite=False, merge=False, plot=False, quiet=False, delay=0.25, refresh=False)`
 
-1. `swift.wris.download(...)` and `swift.cwc.download(...)` are **explicit-input APIs**.
-2. Table objects from `swift.wris.stations()`, `swift.wris.basins()`, `swift.cwc.stations()`, and `swift.cwc.basins()` should be passed to `swift.fetch(...)`.
-3. `merge=True` returns concatenated GeoDataFrame results when optional geo dependencies are available; otherwise downloads still complete on disk.
+Downloads data from a HydroSwift table.
+
+Accepted table inputs:
+
+- `swift.wris.stations(...)`
+- `swift.wris.basins(variable=...)`
+- `swift.cwc.stations(...)`
+- `swift.cwc.basins(...)`
+
+Dispatch behavior:
+
+- WRIS station table with `station_code` → station-level WRIS download
+- WRIS basin table with `basin` and `variable` → basin/variable dispatch
+- CWC station table with `code` → station-level CWC download
+- CWC basin table with `basin` → per-basin CWC station expansion and download
+
+---
+
+### Post-processing helpers
+
+#### `swift.merge_only(input_dir=None, output_dir=None, *, mode=None, variable=None)`
+
+Merges previously downloaded station files into GeoPackages.
+
+Parameters:
+
+- `input_dir`: directory containing existing HydroSwift output
+- `output_dir`: where merged GeoPackages should be written; optional
+- `mode`: `wris` or `cwc`
+- `variable`: WRIS variable subset; ignored in CWC mode
+
+#### `swift.plot_only(input_dir=None, output_dir=None, cwc=False, *, mode=None, variable=None, plot_svg=False, moving_average=None, window=None)`
+
+Generates plots from existing HydroSwift outputs.
+
+Parameters:
+
+- `input_dir`: existing HydroSwift output directory
+- `output_dir`: plot destination directory
+- `cwc`: legacy boolean flag for CWC mode
+- `mode`: preferred mode selector, `wris` or `cwc`
+- `variable`: WRIS variable subset; ignored in CWC mode
+- `plot_svg`: also write SVG output
+- `moving_average`: enable moving average overlay, or pass a window value directly
+- `window`: explicit moving average window size
+
+---
+
+### Utility helpers
+
+#### `swift.help()`
+
+Prints Python API help text.
+
+#### `swift.cli_help()`
+
+Prints the CLI parser help text.
+
+#### `swift.cite()`
+
+Prints citation information.
+
+#### `swift.coffee()`
+
+Prints the coffee-break banner.
+
+---
+
+## Legacy removals and migration notes
+
+These legacy names are intentionally removed:
+
+- `swift.datasets`
+- `swift.basins()`
+- `swift.merge()`
+- `swift.plot()`
+
+Use instead:
+
+- `swift.wris.variables()`
+- `swift.wris.basins()`
+- `swift.cwc.basins()`
+- `swift.merge_only()`
+- `swift.plot_only()`

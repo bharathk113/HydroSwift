@@ -1,5 +1,5 @@
 """
-Public Python API for SWIFT.
+Public Python API for HydroSwift.
 
 Namespaced access (preferred):
     swift.wris.download(basin, variable, ...)
@@ -39,10 +39,10 @@ from .cwc import (
 # Python help and CLI help bridge
 # ---------------------------------------------------------
 
-PYTHON_HELP_TEXT = """SWIFT Python API help
+PYTHON_HELP_TEXT = """HydroSwift Python API help
 
 Quick start:
-    import swift_app as swift
+    import hydroswift as swift
 
 Core namespaces:
     swift.wris.variables()                 # WRIS variable catalog
@@ -262,6 +262,7 @@ def _build_args(**kwargs):
     args.cwc_refresh = kwargs.get("cwc_refresh", False)
     args.name_by = kwargs.get("name_by")
     args.gpkg_group = kwargs.get("gpkg_group")
+    args.interface = kwargs.get("interface", "python")
     dataset_keys = ["q", "wl", "atm", "rf", "temp", "rh", "solar", "sed", "gwl"]
     for key in dataset_keys:
         setattr(args, key, False)
@@ -933,7 +934,7 @@ def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False
     """
     Return CWC flood-forecast station metadata.
 
-    By default reads the packaged metadata file shipped with SWIFT
+    By default reads the packaged metadata file shipped with HydroSwift
     (fast, no network).  Pass ``refresh=True`` to fetch live data from
     the CWC FFS portal.
 
@@ -1384,12 +1385,12 @@ def fetch(
     delay=0.25,
     refresh=False,
 ):
-    """Download data for a SWIFT table returned by stations/basins helpers.
+    """Download data for a HydroSwift table returned by stations/basins helpers.
 
     Parameters
     ----------
         stations : pandas.DataFrame
-                SWIFT table (typically from ``swift.wris.stations()``,
+                HydroSwift table (typically from ``swift.wris.stations()``,
                 ``swift.cwc.stations()``, ``swift.wris.basins(variable=...)`` or
                 ``swift.cwc.basins()``).
 
@@ -1816,7 +1817,7 @@ def fetch(
 # ---------------------------------------------------------
 
 def _resolve_mode_input_dir(mode, output_dir):
-    """Derive ``input_dir`` from *mode* using SWIFT conventions (root containing wris/ and cwc/)."""
+    """Derive ``input_dir`` from *mode* using HydroSwift conventions (root containing wris/ and cwc/)."""
     base = Path(output_dir or "output")
     if mode in ("wris", "cwc"):
         return str(base)
@@ -1831,7 +1832,7 @@ def merge_only(
     variable=None,
 ):
     """
-    Merge existing SWIFT station files into GeoPackages.
+    Merge existing HydroSwift station files into GeoPackages.
 
     Basins and (for CWC) agencies are auto-discovered from the directory
     layout under *input_dir*; no basin argument is needed.
@@ -2041,7 +2042,7 @@ def plot_only(
     window=None,
 ):
     """
-    Generate hydrograph plots from existing SWIFT output.
+    Generate hydrograph plots from existing HydroSwift output.
 
     Basins and (for CWC) agencies are auto-discovered from the directory
     layout under *input_dir*; no basin argument is needed.
@@ -2122,7 +2123,7 @@ def plot_only(
 # ---------------------------------------------------------
 
 class SwiftTable(pd.DataFrame):
-    """DataFrame subclass with a SWIFT header in ``repr``."""
+    """DataFrame subclass with a HydroSwift header in ``repr``."""
 
     @property
     def _constructor(self):
@@ -2131,7 +2132,7 @@ class SwiftTable(pd.DataFrame):
     def __repr__(self):
         rows, cols = self.shape
         header = (
-            f"SWIFT Table\n"
+            f"HydroSwift Table\n"
             f"Rows: {rows:,} | Columns: {cols}\n"
             f"{'-' * 40}\n"
         )
@@ -2154,10 +2155,10 @@ def cite():
     print_wish_banner()
     print(
         """
-    If you use SWIFT in your research, please cite:
+    If you use HydroSwift in your research, please cite:
 
     Sarat, C., Dash, D., & Kumar, A. (2026).
-    SWIFT: Automated Retrieval of Hydrological Station Data
+    HydroSwift: Automated Retrieval of Hydrological Station Data
     from India-WRIS and CWC Portals.
     Journal of Open Source Software.
 
@@ -2168,7 +2169,7 @@ def cite():
 
 
 def coffee():
-    """SWIFT coffee break easter egg for notebooks."""
+    """HydroSwift coffee break easter egg for notebooks."""
     print(
         r"""
         ( (

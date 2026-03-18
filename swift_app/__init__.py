@@ -10,7 +10,8 @@ Public commands are still exposed through:
 __version__ = "1.0.0"
 __codename__ = "Arctic Amsterdam"
 
-APP_NAME = "SWIFT — Simple Water Information Fetch Tool"
+APP_NAME = "HydroSwift"
+APP_TAGLINE = "Fast, unified workflows for hydrological data"
 APP_ORG = "Carbform • carbform.github.io"
 
 VERSION = f"{__version__}"

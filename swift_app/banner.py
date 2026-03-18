@@ -2,7 +2,7 @@
 
 import importlib
 
-from . import APP_NAME, APP_ORG, VERSION_FULL
+from . import APP_NAME, APP_ORG, APP_TAGLINE, VERSION_FULL
 
 
 def print_wish_banner() -> None:
@@ -15,7 +15,8 @@ def print_wish_banner() -> None:
             rf"""
 [bold yellow]====================================================================[/bold yellow]
 
-[bold cyan]{APP_NAME}[/bold cyan]
+[bold cyan]{APP_NAME} ⚡[/bold cyan]
+[bold white]{APP_TAGLINE}[/bold white]
 [bold purple]{APP_ORG}[/bold purple]
 
 [bold white]Version: {VERSION_FULL}[/bold white]
@@ -37,7 +38,8 @@ def print_wish_banner() -> None:
             f"""
 ====================================================================
 
-{APP_NAME}
+{APP_NAME} ⚡
+{APP_TAGLINE}
 {APP_ORG}
 
 Version: {VERSION_FULL}

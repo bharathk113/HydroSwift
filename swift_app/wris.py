@@ -11,7 +11,7 @@ from threading import Lock
 
 import pandas as pd
 
-from .utils import Console, Logger
+from .utils import Console, Logger, overwrite_tip, coffee_tip
 
 
 try:
@@ -111,7 +111,7 @@ def _save_timeseries(args, base_output, folder, meta, station, dataset, df, var_
 
     if args.format == "csv":
 
-        header_lines = ["# SWIFT Hydrological Timeseries"]
+        header_lines = ["# HydroSwift Hydrological Timeseries"]
 
         for key, value in meta_dict.items():
             if value is not None and value != "":
@@ -341,7 +341,7 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
     if est_runtime > 600 and not Console.is_quiet:
         mins = est_runtime // 60
         Console.info(f"Estimated total runtime: ~{mins} minutes ({total_stations} stations)")
-        print(f"{Console.ITALIC}Tip: enable --coffee mode for long runs ☕{Console.RESET}")
+        print(f"{Console.ITALIC}{coffee_tip(args)}{Console.RESET}")
 
     for dataset_code, folder in selected.items():
 
@@ -398,7 +398,7 @@ def run_wris_download(args, selected: dict[str, str], client, basin_code: str):
         if skipped > 0:
             Console.warn(f"Stations skipped (already downloaded): {skipped}")
             if not Console.is_quiet:
-                print(f"{Console.ITALIC}Tip: call with overwrite=True to refresh data.{Console.RESET}")
+                print(f"{Console.ITALIC}{overwrite_tip(args)}{Console.RESET}")
             logger.log("INFO", f"Skipped {skipped} existing stations")
 
         counter = {"downloaded": 0, "failed_or_empty": 0}

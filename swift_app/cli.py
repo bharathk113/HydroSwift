@@ -1,4 +1,4 @@
-"""Command-line parsing for SWIFT."""
+"""Command-line parsing for HydroSwift."""
 
 from __future__ import annotations
 
@@ -57,11 +57,11 @@ DATASET_COLUMNS = {
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build argument parser for SWIFT CLI."""
+    """Build argument parser for the HydroSwift CLI."""
     parser = argparse.ArgumentParser(
         prog="swift",
         description=(
-            "SWIFT — Simple Water Information Fetch Tool\n\n"
+            "HydroSwift - Fast, unified workflows for hydrological data\n\n"
             "Download hydrological datasets from India-WRIS and CWC."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -69,7 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     from . import VERSION
 
-    parser.add_argument("--version", action="version", version=f"SWIFT {VERSION}")
+    parser.add_argument("--version", action="version", version=f"HydroSwift {VERSION}")
 
     basin_help = "WRIS basin name or number:\n"
     for num, name in WRIS_BASINS.items():
