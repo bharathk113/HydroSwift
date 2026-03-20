@@ -1,11 +1,10 @@
-"""SWIFT app package metadata.
+"""Public HydroSwift package backed by the legacy ``swift_app`` source tree."""
 
-Internal implementation package for SWIFT.
-Public commands are exposed through:
-- python -m hydroswift ...
-- hyswift ... (if installed)
-- python -m swift_app ... (legacy internal entrypoint)
-"""
+from pathlib import Path as _Path
+
+# Reuse the existing implementation modules from the legacy source directory
+# so public imports can use ``hydroswift.*`` without a risky code move.
+__path__ = [str(_Path(__file__).resolve().parent.parent / "swift_app")]
 
 __version__ = "1.0.0"
 __codename__ = "Arctic Amsterdam"
@@ -17,7 +16,7 @@ APP_ORG = "Carbform • carbform.github.io"
 VERSION = f"{__version__}"
 VERSION_FULL = f"{VERSION} — {__codename__}"
 
-from .api import (
+from .api import (  # noqa: E402
     wris,
     cwc_ns as cwc,
     help,
@@ -28,7 +27,7 @@ from .api import (
     cite,
     coffee,
 )
-from .base_client import BaseHydrologyClient
+from .base_client import BaseHydrologyClient  # noqa: E402
 
 
 _LEGACY_API_REDIRECTS = {
@@ -53,4 +52,4 @@ def __getattr__(name: str):
     """Provide clear migration guidance for removed legacy API symbols."""
     if name in _LEGACY_API_REDIRECTS:
         raise AttributeError(_LEGACY_API_REDIRECTS[name])
-    raise AttributeError(f"module 'swift_app' has no attribute {name!r}")
+    raise AttributeError(f"module 'hydroswift' has no attribute {name!r}")
