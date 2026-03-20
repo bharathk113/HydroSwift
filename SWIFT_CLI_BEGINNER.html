@@ -365,7 +365,7 @@
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell"><h1>SWIFT CLI — Beginner-Friendly Guide</h1><br><br>This notebook explains <strong>how to use the SWIFT CLI step-by-step</strong>, with clear mapping to the Python API.<br><br>👉 If <code>swift</code> is not found, use:<br><br><code></code>`<br>python -m swift_app<br><code></code>`</div>
+                <div class="markdown-cell"><h1>HydroSwift CLI — Beginner-Friendly Guide</h1><br><br>This notebook explains <strong>how to use the HydroSwift CLI step-by-step</strong>, with clear mapping to the Python API.<br><br>👉 If <code>swift</code> is not found, use:<br><br><code></code>`<br>python -m swift_app<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -377,13 +377,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift -h</pre></div>
+                <div class="input-area"><pre>!hyswift -h</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell"><h2>2. Core Idea (Very Important)</h2><br><br>SWIFT CLI is <strong>flag-based</strong>, not subcommand-based.<br><br>👉 You build commands like:<br><code></code>`<br>swift -b <basin> <dataset flags><br><code></code>`<br><br><h3>Python equivalent:</h3><br><code></code>`python<br>swift.get_wris_data(var='discharge', basin='Godavari')<br><code></code>`</div>
+                <div class="markdown-cell"><h2>2. Core Idea (Very Important)</h2><br><br>HydroSwift CLI is <strong>flag-based</strong>, not subcommand-based.<br><br>👉 You build commands like:<br><code></code>`<br>hyswift -b <basin> <dataset flags><br><code></code>`<br><br><h3>Python equivalent:</h3><br><code></code>`python<br>hydroswift.wris.download(basin='Godavari', variable='discharge')<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -395,7 +395,7 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift --list</pre></div>
+                <div class="input-area"><pre>!hyswift --list</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -413,13 +413,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift -b 5 -q</pre></div>
+                <div class="input-area"><pre>!hyswift -b 5 -q</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.get_wris_data('discharge', basin=5)<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.wris.download(basin=5, variable='discharge')<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -431,13 +431,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift -b Krishna -q -rf -temp</pre></div>
+                <div class="input-area"><pre>!hyswift -b Krishna -q -rf -temp</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.get_wris_data(['discharge','rainfall','temperature'], basin='Krishna')<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.wris.download(basin='Krishna', variable=['discharge', 'rainfall', 'temperature'])<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -449,13 +449,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift -b 6 -q --start-date 2020-01-01 --end-date 2022-01-01</pre></div>
+                <div class="input-area"><pre>!hyswift -b 6 -q --start-date 2020-01-01 --end-date 2022-01-01</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.get_wris_data('discharge', basin=6, start_date='2020-01-01', end_date='2022-01-01')<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.wris.download(basin=6, variable='discharge', start_date='2020-01-01', end_date='2022-01-01')<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -467,13 +467,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift -b 5 -q --output-dir data --format csv --overwrite</pre></div>
+                <div class="input-area"><pre>!hyswift -b 5 -q --output-dir data --format csv --overwrite</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.get_wris_data('discharge', basin=5, output_dir='data', format='csv', overwrite=True)<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.wris.download(basin=5, variable='discharge', output_dir='data', format='csv', overwrite=True)<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -485,13 +485,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift -b 5 -q --plot</pre></div>
+                <div class="input-area"><pre>!hyswift -b 5 -q --plot</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.get_wris_data('discharge', basin=5, plot=True)<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.wris.download(basin=5, variable='discharge', plot=True)<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -503,13 +503,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift --merge-only --input-dir output</pre></div>
+                <div class="input-area"><pre>!hyswift --merge-only --input-dir output</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.merge_only(input_dir='output')<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.merge_only(input_dir='output')<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -521,13 +521,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift --plot-only --input-dir output</pre></div>
+                <div class="input-area"><pre>!hyswift --plot-only --input-dir output</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.plot_only(input_dir='output')<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.plot_only(input_dir='output')<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -539,13 +539,13 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift --cwc</pre></div>
+                <div class="input-area"><pre>!hyswift --cwc</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
             <div class="cell-prompt prompt-empty">&nbsp;</div>
             <div class="cell-content">
-                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>swift.get_cwc_data()<br><code></code>`</div>
+                <div class="markdown-cell">Python equivalent:<br><code></code>`python<br>hydroswift.cwc.download(basin=['Krishna'])<br><code></code>`</div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -557,7 +557,7 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift --cwc-station 032-LGDHYD</pre></div>
+                <div class="input-area"><pre>!hyswift --cwc-station 032-LGDHYD</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">
@@ -569,7 +569,7 @@
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>!swift --cwc-basin Krishna</pre></div>
+                <div class="input-area"><pre>!hyswift --cwc-basin Krishna</pre></div>
             </div>
         </div>
         <div class="cell cell-markdown">

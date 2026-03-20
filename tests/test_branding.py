@@ -12,6 +12,7 @@ def test_cli_help_uses_hydroswift_branding():
     parser = build_parser()
     help_text = parser.format_help()
     assert "HydroSwift - Fast, unified workflows for hydrological data" in help_text
+    assert parser.prog == "hyswift"
 
 
 def test_hydroswift_submodule_imports_work():

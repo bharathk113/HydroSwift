@@ -1,10 +1,9 @@
 """
-SWIFT — Simple Water Information Fetch Tool
-Legacy launcher for the modular SWIFT package.
+HydroSwift legacy launcher for the modular HydroSwift package.
 
 Allows execution without installation:
 
-    python swift.py -b Krishna -q
+    python -m hydroswift -b Krishna -q
 """
 
 from swift_app import APP_NAME, APP_ORG, __version__, __codename__
@@ -27,7 +26,7 @@ if __name__ == "__main__":
 
     except Exception as exc:
 
-        print("\nERROR: SWIFT encountered an unexpected issue.")
+        print("\nERROR: HydroSwift encountered an unexpected issue.")
         print("Reason:", str(exc))
         print("Try running again or check network/API status.")
 

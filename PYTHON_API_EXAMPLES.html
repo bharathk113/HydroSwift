@@ -5461,7 +5461,7 @@ Output directory: output/cwc
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [ ]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>dg = swift.merge_only(
+                <div class="input-area"><pre>dg = hydroswift.merge_only(
     mode='cwc', # mode = 'cwc' when merging cwc data 
     input_dir="data_fetch_cwc", 
     output_dir='merged_cwc') 
@@ -5656,7 +5656,7 @@ Saved GeoPackage: merged_cwc/cwc/cwc_waterlevel_west_flowing_rivers_from_tapi_to
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [2]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>dh = swift.merge_only(mode='wris', # mode = 'wris' when merging wris data 
+                <div class="input-area"><pre>dh = hydroswift.merge_only(mode='wris', # mode = 'wris' when merging wris data 
  input_dir="data_fetch_wris",
  output_dir='merged_wris', 
  variable=['sediment', 'water_level']) # If variable is not specified, all variables in the downloaded files will be merged and returned in the geodataframe.
@@ -5871,7 +5871,7 @@ Saved GeoPackage: merged_wris/wris/cauvery_sediment.gpkg (688 rows)
                     <div class="output-wrapper">
                         <div class="cell-prompt output-prompt"></div>
                         <div class="output-content">
-                            <div class="output-stream output-stderr">/tmp/ipykernel_1681460/1662655967.py:1: UserWarning: swift.plot_only(mode='cwc', ...) ignores variable; CWC data only has water levels.
+                            <div class="output-stream output-stderr">/tmp/ipykernel_1681460/1662655967.py:1: UserWarning: hydroswift.plot_only(mode='cwc', ...) ignores variable; CWC data only has water levels.
   swift.plot_only (mode='cwc', # mode = 'cwc' when plotting cwc data
 </div>
                         </div>
@@ -6106,7 +6106,7 @@ Plots generated: 83
         <div class="cell cell-code">
             <div class="cell-prompt input-prompt">In [9]:</div>
             <div class="cell-content">
-                <div class="input-area"><pre>swift.coffee()</pre></div>
+                <div class="input-area"><pre>hydroswift.coffee()</pre></div>
                 <div class="output-area">
                     <div class="output-wrapper">
                         <div class="cell-prompt output-prompt"></div>

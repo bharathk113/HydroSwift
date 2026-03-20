@@ -20,4 +20,4 @@ def test_coffee_tip_uses_cli_wording_for_cli_interface():
 
 def test_coffee_tip_uses_python_wording_for_python_interface():
     args = SimpleNamespace(interface="python")
-    assert coffee_tip(args) == "Tip: call swift.coffee() before a long run ☕"
+    assert coffee_tip(args) == "Tip: call hydroswift.coffee() before a long run ☕"

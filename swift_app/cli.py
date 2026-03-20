@@ -59,7 +59,7 @@ DATASET_COLUMNS = {
 def build_parser() -> argparse.ArgumentParser:
     """Build argument parser for the HydroSwift CLI."""
     parser = argparse.ArgumentParser(
-        prog="swift",
+        prog="hyswift",
         description=(
             "HydroSwift - Fast, unified workflows for hydrological data\n\n"
             "Download hydrological datasets from India-WRIS and CWC."
@@ -80,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     source.add_argument(
         "--cwc",
         action="store_true",
-        help="Use CWC source (Python equivalent: swift.cwc.download(...))",
+        help="Use CWC source (Python equivalent: hydroswift.cwc.download(...))",
     )
     source.add_argument(
         "--cwc-station",
@@ -119,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
     download.add_argument(
         "--merge-only",
         action="store_true",
-        help="Only merge existing output (Python equivalent: swift.merge_only(...))",
+        help="Only merge existing output (Python equivalent: hydroswift.merge_only(...))",
     )
     download.add_argument("--delay", type=float, default=0.25, help="Delay between WRIS API requests (seconds)")
     download.add_argument("--start-date", default="1950-01-01", help="Start date (YYYY-MM-DD)")

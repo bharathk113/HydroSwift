@@ -30,7 +30,7 @@ rich = ["rich"]
 all = ["geopandas", "shapely", "rich"]
 
 [project.scripts]
-swift = "hydroswift.main:main"
+hyswift = "hydroswift.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

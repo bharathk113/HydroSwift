@@ -1,4 +1,4 @@
-"""Shared utilities for SWIFT (console output, logging)."""
+"""Shared utilities for HydroSwift (console output, logging)."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def overwrite_tip(args) -> str:
 def coffee_tip(args) -> str:
     """Return a long-run hint suitable for the active interface."""
     if get_interface(args) == "python":
-        return "Tip: call swift.coffee() before a long run ☕"
+        return "Tip: call hydroswift.coffee() before a long run ☕"
     return "Tip: enable --coffee mode for long runs ☕"
 
 class Logger:

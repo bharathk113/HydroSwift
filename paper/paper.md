@@ -1,5 +1,5 @@
 ---
-title: 'SWIFT: Simple Water Information Fetch Tool'
+title: 'HydroSwift: Simple Water Information Fetch Tool'
 tags:
   - Python
   - hydrology
@@ -23,7 +23,7 @@ bibliography: paper.bib
 
 # Summary
 
-The Simple Water Information Fetch Tool (`SWIFT`) is an open-source Python package and command-line interface designed to automate the retrieval of hydrological station data from public Indian portals. Hydrological data such as river discharge, water level, rainfall, and groundwater levels are critical for water resource management, climate change studies, and basic research in hydrology. Currently, SWIFT supports data fetching from the India Water Resources Information System (India-WRIS) and the Central Water Commission (CWC) Flood Forecasting System. By automating the discovery of basins and stations, downloading time-series observations, and providing utilities for merging into geospatial formats, SWIFT enables reproducible and efficient workflows for working with Indian hydrological data.
+The Simple Water Information Fetch Tool (`HydroSwift`) is an open-source Python package and command-line interface designed to automate the retrieval of hydrological station data from public Indian portals. Hydrological data such as river discharge, water level, rainfall, and groundwater levels are critical for water resource management, climate change studies, and basic research in hydrology. Currently, HydroSwift supports data fetching from the India Water Resources Information System (India-WRIS) and the Central Water Commission (CWC) Flood Forecasting System. By automating the discovery of basins and stations, downloading time-series observations, and providing utilities for merging into geospatial formats, HydroSwift enables reproducible and efficient workflows for working with Indian hydrological data.
 
 # Statement of need
 
@@ -31,11 +31,11 @@ Researchers and hydrological practitioners often face significant hurdles when a
 
 While the NWIC and India-WRIS maintain Application Programming Interfaces (APIs), including Swagger UI endpoints, these backend services are primarily optimized for their own web applications. They lack structured programmatic wrappers, user-friendly documentation, and require complex workflows—such as GUI-based token generation for individual datasets, session cookie persistence, and managing undocumented payload structures. Such architectures are antithetical to the reproducible, shell-scriptable workflows necessary for bulk scientific analysis. 
 
-`SWIFT` was designed to bridge this gap, partly inspired by recent efforts to construct comprehensive sub-daily river discharge networks over India for the GUARDIAN dataset [@patidar2024guardian]. SWIFT abstract away the complex session persistence, pagination, and undocumented API quirks of the government endpoints. It provides both a simple command-line interface for shell-based automation and a Python API for integration into larger analytical pipelines. Crucially, as the community leans towards relying on large-sample open datasets, SWIFT will be immensely useful for continually updating and maintaining published hydrological datasets for Indian basins, such as CAMELS-IND [@mangukiya2025camels] and other recent large-scale hydrological compilations [@wrr2025]. 
+`HydroSwift` was designed to bridge this gap, partly inspired by recent efforts to construct comprehensive sub-daily river discharge networks over India for the GUARDIAN dataset [@patidar2024guardian]. HydroSwift abstract away the complex session persistence, pagination, and undocumented API quirks of the government endpoints. It provides both a simple command-line interface for shell-based automation and a Python API for integration into larger analytical pipelines. Crucially, as the community leans towards relying on large-sample open datasets, HydroSwift will be immensely useful for continually updating and maintaining published hydrological datasets for Indian basins, such as CAMELS-IND [@mangukiya2025camels] and other recent large-scale hydrological compilations [@wrr2025]. 
 
 # Functionality and Features
 
-SWIFT goes beyond simple data retrieval. It is designed as a comprehensive data processing utility tailored for hydrological analysis. 
+HydroSwift goes beyond simple data retrieval. It is designed as a comprehensive data processing utility tailored for hydrological analysis. 
 
 **Data Retrieval**: The tool currently supports robust, parallelized fetching of nine critical terrestrial variables from the India-WRIS and CWC portals: 
 * River Discharge
@@ -48,17 +48,17 @@ SWIFT goes beyond simple data retrieval. It is designed as a comprehensive data 
 * Suspended Sediment
 * Groundwater Levels
 
-**Data Processing**: Downloading time series is only the first step in hydrological modeling workflows. SWIFT natively includes data processing pipelines to merge individual, station-level CSVs into unified geospatial formats (GeoPackage `*.gpkg` files) by attaching geographic coordinates from station metadata. This allows researchers to immediately load entire basin networks into spatial tools like QGIS or GeoPandas.
+**Data Processing**: Downloading time series is only the first step in hydrological modeling workflows. HydroSwift natively includes data processing pipelines to merge individual, station-level CSVs into unified geospatial formats (GeoPackage `*.gpkg` files) by attaching geographic coordinates from station metadata. This allows researchers to immediately load entire basin networks into spatial tools like QGIS or GeoPandas.
 
-**First-Cut Plotting**: To speed up exploratory data analysis (EDA), SWIFT includes built-in hydrograph and time-series plotting utilities. Researchers can rapidly generate "first-cut" visualizations of the downloaded data directly from the CLI to visually inspect data continuity and identify hydrologic extremes before moving into complex modeling.
+**First-Cut Plotting**: To speed up exploratory data analysis (EDA), HydroSwift includes built-in hydrograph and time-series plotting utilities. Researchers can rapidly generate "first-cut" visualizations of the downloaded data directly from the CLI to visually inspect data continuity and identify hydrologic extremes before moving into complex modeling.
 
 # State of the field
 
-Existing mature software tools for hydrological data retrieval largely focus on generic global datasets or specific non-Indian agencies, such as the `dataRetrieval` ecosystem for the USGS [@decicco2015dataretrieval] and the `HyRiver` suite in Python [@chegini2021hyriver]. For Indian basins, researchers have historically resorted to writing one-off web scraping or API query scripts tailored to a single analysis. These scripts are rarely generalized, maintained, or tested. `SWIFT` provides a stable, community-maintained interface equivalently robust to established international tools, natively handling the complex authentication, session persistence, and API pagination inherent in Indian systems like India-WRIS [@indiawris] and CWC [@cwc].
+Existing mature software tools for hydrological data retrieval largely focus on generic global datasets or specific non-Indian agencies, such as the `dataRetrieval` ecosystem for the USGS [@decicco2015dataretrieval] and the `HyRiver` suite in Python [@chegini2021hyriver]. For Indian basins, researchers have historically resorted to writing one-off web scraping or API query scripts tailored to a single analysis. These scripts are rarely generalized, maintained, or tested. `HydroSwift` provides a stable, community-maintained interface equivalently robust to established international tools, natively handling the complex authentication, session persistence, and API pagination inherent in Indian systems like India-WRIS [@indiawris] and CWC [@cwc].
 
 # Architecture
 
-`SWIFT` is structured into two main components:
+`HydroSwift` is structured into two main components:
 1. **Core Download Engine**: Handles the HTTP interactions, API session management, retries, and data parsing (`api.py`, `cwc.py`, `download.py`). It employs exponential backoff for resilience against transient network failures.
 2. **User Interface Layer**: Provides a robust Command Line Interface (`cli.py`) built with standard libraries, alongside a flexible Python API (`api_public.py`) that mirrors the CLI commands for programmatic use.
 

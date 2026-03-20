@@ -49,13 +49,13 @@ INSTALLATION
 
 From source:
 
-    git clone https://github.com/carbform/swift.git
+    git clone https://github.com/carbform/hydroswift.git
     cd swift
     pip install -e .
 
 Using pip (future release):
 
-    pip install swift
+    pip install hydroswift
 
 ------------------------------------------------------------
 ## Quick Test
@@ -63,9 +63,9 @@ Using pip (future release):
 After installation, verify HydroSwift is working by running:
 
     python -m hydroswift --help
-    swift --version
+    hyswift --version
 
-This should display the HydroSwift command-line interface and available options.
+This should display the HydroSwift command-line interface (`hyswift`) and available options.
 
 ## Documentation
 
@@ -81,15 +81,15 @@ This should display the HydroSwift command-line interface and available options.
 HydroSwift is primarily designed as a Python module for scripts and Jupyter notebooks.
 
 ```python
-import hydroswift as swift
+import hydroswift
 
 # Discover metadata tables
-wris_vars = swift.wris.variables()
-wris_basins = swift.wris.basins(variable=["discharge", "rainfall"])
-cwc_basins = swift.cwc.basins()
+wris_vars = hydroswift.wris.variables()
+wris_basins = hydroswift.wris.basins(variable=["discharge", "rainfall"])
+cwc_basins = hydroswift.cwc.basins()
 
 # Explicit namespace downloads (direct values only)
-swift.wris.download(
+hydroswift.wris.download(
     basin=["Krishna", "Godavari"],
     variable=["discharge", "rainfall"],
     start_date="2024-01-01",
@@ -97,7 +97,7 @@ swift.wris.download(
     merge=True,
 )
 
-swift.cwc.download(
+hydroswift.cwc.download(
     station=["040-CDJAPR", "032-LGDHYD"],
     start_date="2024-01-01",
     end_date="2024-01-07",
@@ -105,36 +105,36 @@ swift.cwc.download(
 )
 
 # Unified table-driven workflow (recommended for station/basin tables)
-wris_stations = swift.wris.stations(basin="Krishna", variable="discharge")
-swift.fetch(wris_stations, merge=True)
+wris_stations = hydroswift.wris.stations(basin="Krishna", variable="discharge")
+hydroswift.fetch(wris_stations, merge=True)
 
-cwc_stations = swift.cwc.stations(basin=["Krishna", "Godavari"])
-swift.fetch(cwc_stations, merge=True)
+cwc_stations = hydroswift.cwc.stations(basin=["Krishna", "Godavari"])
+hydroswift.fetch(cwc_stations, merge=True)
 
 # Basin table -> fetch
-swift.fetch(swift.wris.basins(variable="solar"), start_date="2024-01-01")
-swift.fetch(swift.cwc.basins().head(2), start_date="2024-01-01")
+hydroswift.fetch(hydroswift.wris.basins(variable="solar"), start_date="2024-01-01")
+hydroswift.fetch(hydroswift.cwc.basins().head(2), start_date="2024-01-01")
 ```
 
 ### Public API summary
 
-- `swift.wris.download(...)`: WRIS download using explicit `basin` + `variable` inputs.
-- `swift.cwc.download(...)`: CWC download using explicit `station` and/or `basin` inputs.
-- `swift.fetch(table, ...)`: generic entry point for WRIS/CWC station or basin tables.
-- `swift.wris.stations(...)`, `swift.cwc.stations(...)`: metadata discovery tables.
-- `swift.wris.variables()`, `swift.wris.basins(...)`, `swift.cwc.basins(...)`: lookup tables.
-- `swift.merge_only(...)`, `swift.plot_only(...)`: post-processing helpers.
+- `hydroswift.wris.download(...)`: WRIS download using explicit `basin` + `variable` inputs.
+- `hydroswift.cwc.download(...)`: CWC download using explicit `station` and/or `basin` inputs.
+- `hydroswift.fetch(table, ...)`: generic entry point for WRIS/CWC station or basin tables.
+- `hydroswift.wris.stations(...)`, `hydroswift.cwc.stations(...)`: metadata discovery tables.
+- `hydroswift.wris.variables()`, `hydroswift.wris.basins(...)`, `hydroswift.cwc.basins(...)`: lookup tables.
+- `hydroswift.merge_only(...)`, `hydroswift.plot_only(...)`: post-processing helpers.
 
 > Note: namespace downloads intentionally reject DataFrame/table arguments.
-> Pass tables to `swift.fetch(...)` instead.
+> Pass tables to `hydroswift.fetch(...)` instead.
 
-> Legacy note: `swift.datasets` and `swift.basins()` are removed.
+> Legacy note: `hydroswift.datasets` and `hydroswift.basins()` are removed.
 
 ### Metadata behavior
 
 - WRIS metadata is discovered on request during station lookup/download workflows.
 - CWC metadata is packaged (and optionally cached/refreshed) to avoid unnecessary API calls, because it is mostly static and usually changes only when station/HFL metadata updates.
-- `swift.cwc.stations(..., refresh=True)` first refreshes live metadata and then applies filters such as `basin="Krishna"`.
+- `hydroswift.cwc.stations(..., refresh=True)` first refreshes live metadata and then applies filters such as `basin="Krishna"`.
 
 ------------------------------------------------------------
 
@@ -144,7 +144,7 @@ HydroSwift can also be used as a standalone command-line tool for rapid data acq
 
 Download discharge observations for the Krishna basin:
 
-    swift -b krishna -q
+    hyswift -b krishna -q
 
 This command will:
 
@@ -156,39 +156,39 @@ This command will:
 
 Download multiple datasets (short flags):
 
-    swift -b godavari -q -rf -temp
+    hyswift -b godavari -q -rf -temp
 
 Same command with Python-like long variable names:
 
-    swift -b godavari --discharge --rainfall --temperature
+    hyswift -b godavari --discharge --rainfall --temperature
 
 Download CWC gauge water level data:
 
-    swift --cwc
+    hyswift --cwc
 
 Download selected CWC stations (aliases: `--cwc-station` or `--station`):
 
-    swift --station 040-CDJAPR 032-LGDHYD
+    hyswift --station 040-CDJAPR 032-LGDHYD
 
 Filter CWC download by basin names:
 
-    swift --cwc-basin Krishna Godavari
+    hyswift --cwc-basin Krishna Godavari
 
 Merge downloaded station datasets into a GeoPackage:
 
-    swift -b krishna -q --merge
+    hyswift -b krishna -q --merge
 
 Generate publication-ready plots from downloaded data:
 
-    swift --plot-only --input-dir output --plot-moving-average-window 30 --plot-svg
+    hyswift --plot-only --input-dir output --plot-moving-average-window 30 --plot-svg
 
 Run silently (no console UI):
 
-    swift -b krishna -q --quiet
+    hyswift -b krishna -q --quiet
 
 List WRIS basins and CWC station availability info:
 
-    swift --list
+    hyswift --list
 
 ------------------------------------------------------------
 
