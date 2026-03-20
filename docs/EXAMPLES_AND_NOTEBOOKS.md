@@ -6,8 +6,7 @@ HydroSwift ships example notebooks in the repository root rather than inside `do
 
 ### Python API examples
 
-- `PYTHON_API_EXAMPLES.ipynb`
-- `PYTHON_API_EXAMPLES.html`
+- `hydroswift_python_examples.ipynb` [hydroswift_python_examples.ipynb]
 
 This example demonstrates:
 
@@ -37,7 +36,7 @@ This example demonstrates:
 
 ## How to use these examples alongside the docs
 
-- Read [Python API Guide](PYTHON_API_GUIDE.md) before running `PYTHON_API_EXAMPLES.ipynb`.
+- Read [Python API Guide](PYTHON_API_GUIDE.md) before running `hydroswift_python_examples.ipynb`.
 - Read [CLI Usage Guide](CLI_USAGE_GUIDE.md) before running `SWIFT_CLI_BEGINNER.ipynb`.
 - Use [Public API and CLI Map](PUBLIC_API_AND_CLI.md) when translating a notebook action from Python to CLI or vice versa.
 
