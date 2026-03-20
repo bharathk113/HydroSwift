@@ -1,38 +1,27 @@
 # HydroSwift ⚡
 
-HydroSwift is a unified toolkit for hydrological data integration, analysis, and visualization.
+**Fast, unified workflows for hydrological data.**
 
-Designed for fast, reproducible basin-scale workflows.
+HydroSwift is a Python toolkit for integrating, processing, and visualizing hydrological datasets at basin scale. It automates retrieval from [India-WRIS](https://indiawris.gov.in/) and the [CWC Flood Forecasting System](https://ffs.india-water.gov.in/) while preserving reproducible CLI and notebook workflows.
 
-HydroSwift currently downloads hydrology data from two sources:
+## Supported data sources
 
-- **India-WRIS** for multiple hydrological variables such as discharge, rainfall, temperature, humidity, sediment, groundwater level, solar radiation, atmospheric pressure, and water level.
-- **CWC Flood Forecasting System** for **water-level** station data.
+| Source | Variables |
+|---|---|
+| **India-WRIS** | Discharge, water level, rainfall, temperature, humidity, solar radiation, sediment, groundwater level, atmospheric pressure |
+| **CWC FFS** | Water level |
 
-This documentation has been rewritten to match the current codebase and the example workflows shown in:
-
-- `hydroswift_python_examples.ipynb` / `hydroswift_python_examples.html`
-- `hydroswift_cli_examples.ipynb` / `hydroswift_cli_examples.html`
-
-## How HydroSwift is organized
+## How HydroSwift is organised
 
 HydroSwift exposes two main interfaces:
 
 1. **Python API** via `import hydroswift`
 2. **CLI** via `hyswift ...` or `python -m hydroswift ...`
 
-The Python API has two styles:
+The Python API offers two styles:
 
-- **Explicit namespace downloads** for when you already know the basin/station values you want.
-- **Table-driven workflows** for when you first discover basins or stations, then pass those tables into `hydroswift.fetch(...)`.
-
-## Recommended reading order
-
-- [Python API Guide](PYTHON_API_GUIDE.md) — concepts, workflows, and examples.
-- [CLI Usage Guide](CLI_USAGE_GUIDE.md) — every supported CLI flag and common command patterns.
-- [API Functions Reference](API_FUNCTIONS_REFERENCE.md) — signatures, parameter meanings, return shapes, and notes.
-- [Public API and CLI Map](PUBLIC_API_AND_CLI.md) — side-by-side mapping between notebook examples, Python, and CLI usage.
-- [Examples and Notebooks](EXAMPLES_AND_NOTEBOOKS.md) — where the example notebooks fit and what they demonstrate.
+- **Explicit namespace downloads** — use `hydroswift.wris.download(...)` or `hydroswift.cwc.download(...)` when you already know the basin/station values.
+- **Table-driven workflows** — discover basins or stations first, then pass those tables into `hydroswift.fetch(...)`.
 
 ## Quick start
 
@@ -44,7 +33,6 @@ import hydroswift
 stations = hydroswift.wris.stations(basin="Godavari", variable="discharge")
 result = hydroswift.fetch(
     stations,
-    output_dir="output",
     start_date="2024-01-01",
     end_date="2024-01-10",
     merge=True,
@@ -57,19 +45,32 @@ result = hydroswift.fetch(
 hyswift -b Godavari -q --start-date 2024-01-01 --end-date 2024-01-10 --merge
 ```
 
+## Documentation
+
+| Guide | Description |
+|---|---|
+| [Python API Guide](PYTHON_API_GUIDE.md) | Concepts, workflows, and examples |
+| [CLI Usage Guide](CLI_USAGE_GUIDE.md) | Supported CLI flags and common command patterns |
+| [API Functions Reference](API_FUNCTIONS_REFERENCE.md) | Signatures, parameters, and return shapes |
+| [API ↔ CLI Map](PUBLIC_API_AND_CLI.md) | Side-by-side notebook, Python, and CLI mapping |
+
+## Example notebooks
+
+- [Python API Examples](examples/hydroswift_python_examples.ipynb) — full end-to-end workflows
+- [CLI Examples](examples/hydroswift_cli_examples.ipynb) — `hyswift` command demonstrations
+
 ## Important usage rules
 
-- Use `hydroswift.wris.download(...)` and `hydroswift.cwc.download(...)` when you want to pass **explicit basin/station values**.
-- Use `hydroswift.fetch(table, ...)` when your input comes from `hydroswift.wris.stations(...)`, `hydroswift.wris.basins(...)`, `hydroswift.cwc.stations(...)`, or `hydroswift.cwc.basins(...)`.
-- `hydroswift.wris.download(...)` does **not** accept DataFrame inputs.
-- `hydroswift.cwc.download(...)` does **not** accept DataFrame inputs.
-- CWC downloads are **water-level only**.
+!!! note
+    - Use `hydroswift.wris.download(...)` / `hydroswift.cwc.download(...)` for **explicit values only** (no DataFrames).
+    - Use `hydroswift.fetch(table, ...)` for tables from `hydroswift.wris.stations(...)`, `hydroswift.cwc.stations(...)`, etc.
+    - CWC downloads are **water-level only**.
 
 ## Output model
 
-HydroSwift writes downloaded station files under an output directory, then optionally:
+Downloaded station files are saved under an output directory, then optionally:
 
-- merges them into GeoPackages with `merge=True` or `hydroswift.merge_only(...)`
-- creates plots with `plot=True` or `hydroswift.plot_only(...)`
+- merged into GeoPackages with `merge=True` or `hydroswift.merge_only(...)`
+- plotted with `plot=True` or `hydroswift.plot_only(...)`
 
-The post-processing helpers work from existing downloaded files and directory structure rather than requiring basin/station arguments again.
+Post-processing helpers work from existing downloaded files without requiring basin/station arguments again.

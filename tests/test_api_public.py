@@ -414,7 +414,7 @@ def test_cwc_namespace_download_rejects_basin_table_input(monkeypatch):
         api_mod.cwc_ns.download(basin=basin_table.iloc[0:2], quiet=True)
 
 
-def test_cwc_namespace_reconcile_metadata_exposes_appended_count(monkeypatch):
+def test_cwc_namespace_refresh_metadata_exposes_appended_count(monkeypatch):
     import swift_app.api as api_mod
 
     merged = pd.DataFrame([{"code": "001-AAA", "name": "A"}])
@@ -426,7 +426,7 @@ def test_cwc_namespace_reconcile_metadata_exposes_appended_count(monkeypatch):
         lambda write_packaged=False: (merged, appended),
     )
 
-    out = api_mod.cwc_ns.reconcile_metadata(write=False)
+    out = api_mod.cwc_ns.refresh_metadata(write=False)
     assert len(out) == 1
     assert out.attrs["appended_count"] == 1
 

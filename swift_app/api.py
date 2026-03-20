@@ -1340,18 +1340,21 @@ class _CwcNamespace:
         return out
 
     @staticmethod
-    def reconcile_metadata(write=False):
-        """Reconcile `name-code.csv` codes into CWC metadata via live API lookups.
+    def refresh_metadata(write=False):
+        """Refresh packaged CWC metadata via live API lookups.
+
+        Compares `name-code.csv` codes against the packaged metadata and
+        fetches any missing entries from the live CWC API.
 
         Parameters
         ----------
         write : bool, default False
-            If True, overwrite packaged `cwc_meta.csv` with reconciled output.
+            If True, overwrite packaged `cwc_meta.csv` with refreshed output.
 
         Returns
         -------
         SwiftTable
-            Reconciled metadata table. Also includes attrs:
+            Refreshed metadata table. Also includes attrs:
             - ``appended_count``: number of rows discovered from name-code.csv
         """
         merged, appended = repopulate_cwc_metadata_from_name_code(write_packaged=write)

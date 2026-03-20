@@ -93,11 +93,11 @@ Notes:
 - If both `station` and `basin` are provided, HydroSwift downloads only matching stations.
 - `_name_by` and `_gpkg_group` are internal dispatch parameters and should not be part of normal user code.
 
-#### `hydroswift.cwc.reconcile_metadata(write=False)`
+#### `hydroswift.cwc.refresh_metadata(write=False)`
 
-Reconciles packaged metadata against `name-code.csv` using live lookups.
+Refreshes packaged metadata against `name-code.csv` using live lookups.
 
-- `write=False`: return the reconciled table only
+- `write=False`: return the refreshed table only
 - `write=True`: also overwrite the packaged metadata file
 
 ---

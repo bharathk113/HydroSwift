@@ -1,15 +1,13 @@
 # Examples and Notebooks
 
-HydroSwift example notebooks are in the repository root rather than inside `docs/`.
+HydroSwift ships two example notebooks inside `docs/examples/`:
 
 ## Included examples
 
-[Python examples](docs/examples/hydroswift_python_examples.ipynb)
-[CLI Examples](docs/examples/hydroswift_cli_examples.ipynb)
+- [Python API Examples](docs/examples/hydroswift_python_examples.ipynb) — covers discovery, download, merge, plot, and full pipeline workflows using the Python API.
+- [CLI Examples](docs/examples/hydroswift_cli_examples.ipynb) — demonstrates the `hyswift` command-line interface.
 
+## Recommended reading order
 
-## Also..
-
-- Read [Python API Guide](PYTHON_API_GUIDE.md) before running[Python examples](hydroswift_python_examples.ipynb)
-
-- Read [CLI Usage Guide](CLI_USAGE_GUIDE.md) before running [CLI Examples](hydroswift_cli_examples.ipynb).
+1. Read the [Python API Guide](docs/PYTHON_API_GUIDE.md) before running the Python notebook.
+2. Read the [CLI Usage Guide](docs/CLI_USAGE_GUIDE.md) before running the CLI notebook.

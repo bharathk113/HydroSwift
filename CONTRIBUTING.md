@@ -1,6 +1,6 @@
-# Contributing to SWIFT
+# Contributing to HydroSwift
 
-Thank you for your interest in contributing to SWIFT (Simple Water Information Fetch Tool)! We welcome contributions from everyone.
+Thank you for your interest in contributing to HydroSwift! We welcome contributions from everyone.
 
 ## Code of Conduct
 
@@ -28,7 +28,7 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/carbform/hydroswift.git
+   git clone https://github.com/carbform/HydroSwift.git
    cd swift
    ```
 
@@ -45,7 +45,7 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 
 ## Architectural Guidelines
 
-- SWIFT is designed to be extensible. When adding a new data source, ensure it follows the pattern established by the existing WRIS and CWC integrations.
-- Keep the `cli.py` layer separate from the core business logic (e.g., `download.py`, `cwc.py`, `api.py`) to maintain a clean Python-accessible API (`api_public.py`).
+- HydroSwift is designed to be extensible. When adding a new data source, ensure it follows the pattern established by the existing WRIS and CWC integrations.
+- Keep the CLI layer separate from the core business logic (e.g., `download.py`, `cwc.py`, `api.py`) to maintain a clean Python-accessible API.
 
-Thank you for helping improve SWIFT!
+Thank you for helping improve HydroSwift!

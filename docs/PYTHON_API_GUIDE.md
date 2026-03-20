@@ -229,12 +229,12 @@ Behavior notes:
 - Table-like inputs should go to `hydroswift.fetch(...)`, not `hydroswift.cwc.download(...)`.
 - Internal parameters like `_name_by` and `_gpkg_group` exist for internal dispatch; they are not normal user-facing API controls.
 
-### `hydroswift.cwc.reconcile_metadata(write=False)`
+### `hydroswift.cwc.refresh_metadata(write=False)`
 
-Reconciles packaged CWC metadata with `name-code.csv` using live lookups.
+Refreshes packaged CWC metadata with `name-code.csv` using live lookups.
 
 ```python
-meta = hydroswift.cwc.reconcile_metadata(write=False)
+meta = hydroswift.cwc.refresh_metadata(write=False)
 ```
 
 This is a metadata maintenance helper, not part of the common download path.

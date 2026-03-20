@@ -19,6 +19,7 @@ env/
 build/
 dist/
 *.egg-info/
+site/
 
 # --------------------------------------------------
 # SWIFT outputs

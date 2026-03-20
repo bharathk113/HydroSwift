@@ -24,8 +24,8 @@ This page connects the current Python API, the CLI, and the example notebooks.
 
 The repository currently includes two example notebook pairs:
 
-- `PYTHON_API_EXAMPLES.ipynb` / `PYTHON_API_EXAMPLES.html`
-- `SWIFT_CLI_BEGINNER.ipynb` / `SWIFT_CLI_BEGINNER.html`
+- `hydroswift_python_examples.ipynb`
+- `hydroswift_cli_examples.ipynb`
 
 The Python notebook emphasizes:
 
