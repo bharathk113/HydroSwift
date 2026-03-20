@@ -1,10 +1,10 @@
 """SWIFT app package metadata.
 
 Internal implementation package for SWIFT.
-Public commands are still exposed through:
-- python swift.py ...
-- python -m swift ...
-- swift ... (if installed)
+Public commands are exposed through:
+- python -m hydroswift ...
+- hyswift ... (if installed)
+- python -m swift_app ... (legacy internal entrypoint)
 """
 
 __version__ = "1.0.0"
@@ -33,18 +33,18 @@ from .base_client import BaseHydrologyClient
 
 _LEGACY_API_REDIRECTS = {
     "datasets": (
-        "`swift.datasets` has been removed. "
-        "Use `swift.wris.variables()` for WRIS variable definitions."
+        "`hydroswift.datasets` has been removed. "
+        "Use `hydroswift.wris.variables()` for WRIS variable definitions."
     ),
     "basins": (
-        "`swift.basins()` has been removed. "
-        "Use `swift.wris.basins()` for WRIS basins or `swift.cwc.basins()` for CWC basins."
+        "`hydroswift.basins()` has been removed. "
+        "Use `hydroswift.wris.basins()` for WRIS basins or `hydroswift.cwc.basins()` for CWC basins."
     ),
     "merge": (
-        "`swift.merge()` has been removed. Use `swift.merge_only()` instead."
+        "`hydroswift.merge()` has been removed. Use `hydroswift.merge_only()` instead."
     ),
     "plot": (
-        "`swift.plot()` has been removed. Use `swift.plot_only()` instead."
+        "`hydroswift.plot()` has been removed. Use `hydroswift.plot_only()` instead."
     ),
 }
 

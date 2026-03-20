@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.0.0 — Arctic Amsterdam
-- Implement Background Logging with `swift.log`
+- Implement Background Logging with `hydroswift.log`
 - Introduce `--quiet` mode for clean script/terminal integration
 - `--coffee` mode now runs in background with quiet mode enabled
 - Build exponential backoff logic for CWC API requests

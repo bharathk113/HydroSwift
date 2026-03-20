@@ -1,5 +1,5 @@
 """
-SWIFT — Main CLI Entrypoint (Modular Core)
+HydroSwift — Main CLI Entrypoint (Modular Core)
 
 Version: 1.0.0 — Arctic Amsterdam
  
@@ -15,8 +15,8 @@ What this is
 
 This is the modular runtime entrypoint used by both:
 
-    python swift.py ...
-    swift ...           (if installed)
+    python -m hydroswift ...
+    hyswift ...         (if installed)
 
 The legacy top-level script is kept for habit-friendly usage,
 while orchestration now lives in this package file.
@@ -260,7 +260,7 @@ def main() -> int:
         Journal of Open Source Software.
 
         Repository:
-        https://github.com/carbform/swift
+        https://github.com/carbform/HydroSwift
         """)
         return 0
 

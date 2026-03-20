@@ -5,7 +5,7 @@ HydroSwift provides a flag-based CLI.
 Run it as:
 
 ```bash
-swift ...
+hyswift ...
 ```
 
 or, if the console script is not on your path:
@@ -29,7 +29,7 @@ You compose a command from:
 Example:
 
 ```bash
-swift -b Krishna -q -rf -temp
+hyswift -b Krishna -q -rf -temp
 ```
 
 ---
@@ -53,9 +53,9 @@ You can pass either:
 Examples:
 
 ```bash
-swift -b 5 -q
-swift -b Krishna -q -rf -temp
-swift -b Godavari --discharge --rainfall --temperature
+hyswift -b 5 -q
+hyswift -b Krishna -q -rf -temp
+hyswift -b Godavari --discharge --rainfall --temperature
 ```
 
 ---
@@ -77,9 +77,9 @@ Current WRIS variable flags are:
 Examples:
 
 ```bash
-swift -b Godavari -q
-swift -b Krishna -q -rf -temp
-swift -b Krishna --discharge --rainfall
+hyswift -b Godavari -q
+hyswift -b Krishna -q -rf -temp
+hyswift -b Krishna --discharge --rainfall
 ```
 
 ---
@@ -91,10 +91,10 @@ CWC downloads target water-level data.
 You can enter CWC mode with any of the following:
 
 ```bash
-swift --cwc
-swift --cwc-station 040-CDJAPR 032-LGDHYD
-swift --station 040-CDJAPR 032-LGDHYD
-swift --cwc-basin Krishna Godavari
+hyswift --cwc
+hyswift --cwc-station 040-CDJAPR 032-LGDHYD
+hyswift --station 040-CDJAPR 032-LGDHYD
+hyswift --cwc-basin Krishna Godavari
 ```
 
 ### CWC flags
@@ -108,9 +108,9 @@ swift --cwc-basin Krishna Godavari
 Examples aligned with the notebook:
 
 ```bash
-swift --cwc
-swift --cwc-station 032-LGDHYD
-swift --cwc-basin Krishna
+hyswift --cwc
+hyswift --cwc-station 032-LGDHYD
+hyswift --cwc-basin Krishna
 ```
 
 Behavior notes:
@@ -139,15 +139,15 @@ Common download controls include:
 Examples:
 
 ```bash
-swift -b 6 -q --start-date 2020-01-01 --end-date 2022-01-01
+hyswift -b 6 -q --start-date 2020-01-01 --end-date 2022-01-01
 ```
 
 ```bash
-swift -b 5 -q --output-dir data --format csv --overwrite
+hyswift -b 5 -q --output-dir data --format csv --overwrite
 ```
 
 ```bash
-swift -b 5 -q --plot
+hyswift -b 5 -q --plot
 ```
 
 ---
@@ -159,13 +159,13 @@ swift -b 5 -q --plot
 Use existing downloaded files to generate GeoPackages.
 
 ```bash
-swift --merge-only --input-dir output
+hyswift --merge-only --input-dir output
 ```
 
 You may also control the output location:
 
 ```bash
-swift --merge-only --input-dir output --output-dir merged_output
+hyswift --merge-only --input-dir output --output-dir merged_output
 ```
 
 ### Plot only
@@ -173,13 +173,13 @@ swift --merge-only --input-dir output --output-dir merged_output
 Use existing downloaded files to generate plots.
 
 ```bash
-swift --plot-only --input-dir output
+hyswift --plot-only --input-dir output
 ```
 
 With quality options:
 
 ```bash
-swift --plot-only --input-dir output --plot-svg --plot-moving-average-window 30
+hyswift --plot-only --input-dir output --plot-svg --plot-moving-average-window 30
 ```
 
 ---
@@ -189,7 +189,7 @@ swift --plot-only --input-dir output --plot-svg --plot-moving-average-window 30
 ### List mode
 
 ```bash
-swift --list
+hyswift --list
 ```
 
 This prints:
@@ -200,9 +200,9 @@ This prints:
 ### Other utility flags
 
 ```bash
-swift --version
-swift --cite
-swift --coffee
+hyswift --version
+hyswift --cite
+hyswift --coffee
 ```
 
 ---
@@ -215,12 +215,12 @@ Examples:
 
 | CLI | Python API |
 |---|---|
-| `swift -b 5 -q` | `swift.wris.download(basin=5, variable='discharge')` |
-| `swift -b Krishna -q -rf -temp` | `swift.wris.download(basin='Krishna', variable=['discharge', 'rainfall', 'temperature'])` |
-| `swift --merge-only --input-dir output` | `swift.merge_only(input_dir='output')` |
-| `swift --plot-only --input-dir output` | `swift.plot_only(input_dir='output')` |
-| `swift --cwc-station 032-LGDHYD` | `swift.cwc.download(station=['032-LGDHYD'])` |
-| `swift --cwc-basin Krishna` | `swift.cwc.download(basin=['Krishna'])` |
+| `hyswift -b 5 -q` | `hydroswift.wris.download(basin=5, variable='discharge')` |
+| `hyswift -b Krishna -q -rf -temp` | `hydroswift.wris.download(basin='Krishna', variable=['discharge', 'rainfall', 'temperature'])` |
+| `hyswift --merge-only --input-dir output` | `hydroswift.merge_only(input_dir='output')` |
+| `hyswift --plot-only --input-dir output` | `hydroswift.plot_only(input_dir='output')` |
+| `hyswift --cwc-station 032-LGDHYD` | `hydroswift.cwc.download(station=['032-LGDHYD'])` |
+| `hyswift --cwc-basin Krishna` | `hydroswift.cwc.download(basin=['Krishna'])` |
 
 ---
 
@@ -243,4 +243,4 @@ CWC is a water-level workflow. If you need multiple WRIS variables, use WRIS mod
 
 ### Want table-driven workflows from the terminal
 
-The CLI does not expose the same table-native dispatch model as `swift.fetch(...)`. For discover → subset → fetch workflows, prefer the Python API.
+The CLI does not expose the same table-native dispatch model as `hydroswift.fetch(...)`. For discover → subset → fetch workflows, prefer the Python API.

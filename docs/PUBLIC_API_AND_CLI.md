@@ -8,7 +8,7 @@ This page connects the current Python API, the CLI, and the example notebooks.
 
 - station or basin discovery tables
 - DataFrame subsetting before download
-- `swift.fetch(...)`
+- `hydroswift.fetch(...)`
 - notebook workflows
 - merge/plot pipelines controlled in code
 
@@ -29,24 +29,24 @@ The repository currently includes two example notebook pairs:
 
 The Python notebook emphasizes:
 
-- `swift.wris.basins(variable=...)`
-- `swift.wris.stations(...)`
-- `swift.cwc.basins()`
-- `swift.cwc.stations(...)`
-- `swift.fetch(...)`
-- `swift.wris.download(...)`
-- `swift.cwc.download(...)`
-- `swift.merge_only(...)`
-- `swift.plot_only(...)`
+- `hydroswift.wris.basins(variable=...)`
+- `hydroswift.wris.stations(...)`
+- `hydroswift.cwc.basins()`
+- `hydroswift.cwc.stations(...)`
+- `hydroswift.fetch(...)`
+- `hydroswift.wris.download(...)`
+- `hydroswift.cwc.download(...)`
+- `hydroswift.merge_only(...)`
+- `hydroswift.plot_only(...)`
 
 The CLI notebook emphasizes:
 
-- `swift -b ... -q/-rf/-temp/...`
-- `swift --merge-only --input-dir ...`
-- `swift --plot-only --input-dir ...`
-- `swift --cwc`
-- `swift --cwc-station ...`
-- `swift --cwc-basin ...`
+- `hyswift -b ... -q/-rf/-temp/...`
+- `hyswift --merge-only --input-dir ...`
+- `hyswift --plot-only --input-dir ...`
+- `hyswift --cwc`
+- `hyswift --cwc-station ...`
+- `hyswift --cwc-basin ...`
 
 ---
 
@@ -54,18 +54,18 @@ The CLI notebook emphasizes:
 
 | Task | Python API | CLI |
 |---|---|---|
-| Download WRIS discharge for a basin | `swift.wris.download(basin='Godavari', variable='discharge')` | `swift -b Godavari -q` |
-| Download multiple WRIS variables | `swift.wris.download(basin='Krishna', variable=['discharge', 'rainfall', 'temperature'])` | `swift -b Krishna -q -rf -temp` |
-| Discover WRIS stations before downloading | `swift.wris.stations(basin='Godavari', variable='discharge')` | not directly exposed as a table workflow |
-| Download from a WRIS station table | `swift.fetch(wris_table, ...)` | not directly exposed |
-| Download all CWC stations in a basin | `swift.cwc.download(basin=['Krishna'])` | `swift --cwc-basin Krishna` |
-| Download selected CWC stations | `swift.cwc.download(station=['032-LGDHYD'])` | `swift --cwc-station 032-LGDHYD` |
-| Discover CWC station metadata | `swift.cwc.stations(...)` | `swift --list` gives only a summary, not the full table |
-| Merge existing output | `swift.merge_only(input_dir='output')` | `swift --merge-only --input-dir output` |
-| Plot existing output | `swift.plot_only(input_dir='output')` | `swift --plot-only --input-dir output` |
-| Show help | `swift.help()` / `swift.cli_help()` | `swift -h` |
-| Show citation | `swift.cite()` | `swift --cite` |
-| Coffee easter egg | `swift.coffee()` | `swift --coffee` |
+| Download WRIS discharge for a basin | `hydroswift.wris.download(basin='Godavari', variable='discharge')` | `hyswift -b Godavari -q` |
+| Download multiple WRIS variables | `hydroswift.wris.download(basin='Krishna', variable=['discharge', 'rainfall', 'temperature'])` | `hyswift -b Krishna -q -rf -temp` |
+| Discover WRIS stations before downloading | `hydroswift.wris.stations(basin='Godavari', variable='discharge')` | not directly exposed as a table workflow |
+| Download from a WRIS station table | `hydroswift.fetch(wris_table, ...)` | not directly exposed |
+| Download all CWC stations in a basin | `hydroswift.cwc.download(basin=['Krishna'])` | `hyswift --cwc-basin Krishna` |
+| Download selected CWC stations | `hydroswift.cwc.download(station=['032-LGDHYD'])` | `hyswift --cwc-station 032-LGDHYD` |
+| Discover CWC station metadata | `hydroswift.cwc.stations(...)` | `hyswift --list` gives only a summary, not the full table |
+| Merge existing output | `hydroswift.merge_only(input_dir='output')` | `hyswift --merge-only --input-dir output` |
+| Plot existing output | `hydroswift.plot_only(input_dir='output')` | `hyswift --plot-only --input-dir output` |
+| Show help | `hydroswift.help()` / `hydroswift.cli_help()` | `hyswift -h` |
+| Show citation | `hydroswift.cite()` | `hyswift --cite` |
+| Coffee easter egg | `hydroswift.coffee()` | `hyswift --coffee` |
 
 ---
 
@@ -76,9 +76,9 @@ The CLI notebook emphasizes:
 The Python API can pass rich tables between discovery and download:
 
 ```python
-stations = swift.wris.stations(basin="Godavari", variable="discharge")
+stations = hydroswift.wris.stations(basin="Godavari", variable="discharge")
 subset = stations.head(5)
-result = swift.fetch(subset, merge=True)
+result = hydroswift.fetch(subset, merge=True)
 ```
 
 That pattern does not have an equivalent CLI table object.

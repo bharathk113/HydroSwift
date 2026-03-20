@@ -13,12 +13,12 @@ This example demonstrates:
 
 - WRIS basin-table workflows
 - WRIS station-table workflows
-- `swift.fetch(...)`
-- `swift.wris.download(...)`
+- `hydroswift.fetch(...)`
+- `hydroswift.wris.download(...)`
 - CWC basin and station workflows
-- `swift.cwc.download(...)`
-- `swift.merge_only(...)`
-- `swift.plot_only(...)`
+- `hydroswift.cwc.download(...)`
+- `hydroswift.merge_only(...)`
+- `hydroswift.plot_only(...)`
 
 ### CLI beginner examples
 

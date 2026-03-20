@@ -2,15 +2,15 @@
 Public Python API for HydroSwift.
 
 Namespaced access (preferred):
-    swift.wris.download(basin, variable, ...)
-    swift.wris.stations(basin, ...)
-    swift.cwc.download(station, ...)
-    swift.cwc.stations(...)
+    hydroswift.wris.download(basin, variable, ...)
+    hydroswift.wris.stations(basin, ...)
+    hydroswift.cwc.download(station, ...)
+    hydroswift.cwc.stations(...)
 
 Top-level helpers:
-    swift.fetch(source, ...)
-    swift.merge_only(...)
-    swift.plot_only(...)
+    hydroswift.fetch(source, ...)
+    hydroswift.merge_only(...)
+    hydroswift.plot_only(...)
 """
 
 from __future__ import annotations
@@ -42,34 +42,34 @@ from .cwc import (
 PYTHON_HELP_TEXT = """HydroSwift Python API help
 
 Quick start:
-    import hydroswift as swift
+    import hydroswift
 
 Core namespaces:
-    swift.wris.variables()                 # WRIS variable catalog
-    swift.wris.basins(variable=None)       # WRIS basins table
-    swift.wris.stations(basin, variable)   # WRIS station discovery table
-    swift.wris.download(...)               # WRIS download (explicit args)
+    hydroswift.wris.variables()            # WRIS variable catalog
+    hydroswift.wris.basins(variable=None)  # WRIS basins table
+    hydroswift.wris.stations(basin, variable)   # WRIS station discovery table
+    hydroswift.wris.download(...)               # WRIS download (explicit args)
 
-    swift.cwc.basins()                     # CWC basin summary
-    swift.cwc.stations(...)                # CWC station metadata table
-    swift.cwc.download(...)                # CWC download (explicit args)
+    hydroswift.cwc.basins()                     # CWC basin summary
+    hydroswift.cwc.stations(...)                # CWC station metadata table
+    hydroswift.cwc.download(...)                # CWC download (explicit args)
 
 Unified table workflow:
-    swift.fetch(table, ...)                # Download from WRIS/CWC station/basin tables
+    hydroswift.fetch(table, ...)           # Download from WRIS/CWC station/basin tables
 
 Post-processing helpers:
-    swift.merge_only(...)
-    swift.plot_only(...)
+    hydroswift.merge_only(...)
+    hydroswift.plot_only(...)
 
 Utilities:
-    swift.help()                           # this Python API help menu
-    swift.cli_help()                       # CLI help (equivalent to `swift -h`)
-    swift.cite()
-    swift.coffee()
+    hydroswift.help()                           # this Python API help menu
+    hydroswift.cli_help()                       # CLI help (equivalent to `hyswift -h`)
+    hydroswift.cite()
+    hydroswift.coffee()
 """
 
 def cli_help():
-    """Print the command-line help text (equivalent to ``swift -h``)."""
+    """Print the command-line help text (equivalent to ``hyswift -h``)."""
     from .cli import build_parser
 
     parser = build_parser()
@@ -182,12 +182,12 @@ def _normalize_cwc_basin_input(basin):
     if basin is None:
         return []
 
-    # Table-like input (e.g., swift.cwc.basins()[0:3]).
+    # Table-like input (e.g., hydroswift.cwc.basins()[0:3]).
     if isinstance(basin, pd.DataFrame):
         if "basin" not in basin.columns:
             raise ValueError(
                 "Table-like basin input must include a 'basin' column. "
-                "Use swift.cwc.basins() or pass basin names directly."
+                "Use hydroswift.cwc.basins() or pass basin names directly."
             )
         vals = basin["basin"].tolist()
         return [str(b).strip() for b in vals if str(b).strip()]
@@ -276,7 +276,7 @@ def _resolve_basin(basin):
     if isinstance(basin, (list, tuple, set)):
         raise ValueError(
             "basin must be a single basin value here. "
-            "For multiple basins, pass a list to swift.wris.stations() or swift.wris.download()."
+            "For multiple basins, pass a list to hydroswift.wris.stations() or hydroswift.wris.download()."
         )
     if isinstance(basin, int):
         basin = str(basin)
@@ -316,7 +316,7 @@ def get_wris_data(
         (``'discharge'``, ``'water_level'``, ``'rainfall'``, etc.)
         or short codes (``'q'``, ``'wl'``, ``'rf'``).
     basin : str or int
-        Basin name or number (see ``swift.wris.basins()``).
+        Basin name or number (see ``hydroswift.wris.basins()``).
     station : str or list[str], optional
         Limit to specific station code(s).
     start_date, end_date : str
@@ -337,8 +337,8 @@ def get_wris_data(
 
     Examples
     --------
-    >>> swift.get_wris_data('discharge', 'Krishna')
-    >>> swift.get_wris_data(['discharge', 'rainfall'], basin=6,
+    >>> hydroswift.wris.download(basin='Krishna', variable='discharge')
+    >>> hydroswift.wris.download(basin=6, variable=['discharge', 'rainfall'],
     ...                     start_date='2020-01-01', merge=True)
     """
     if isinstance(basin, (list, tuple, set)):
@@ -593,8 +593,8 @@ def get_cwc_data(
 
     Examples
     --------
-    >>> swift.get_cwc_data()
-    >>> swift.get_cwc_data(station='032-LGDHYD', start_date='2020-01-01')
+    >>> hydroswift.cwc.download()
+    >>> hydroswift.cwc.download(station='032-LGDHYD', start_date='2020-01-01')
     """
     # Early user feedback so notebooks show that work has started.
     try:
@@ -720,7 +720,7 @@ def get_cwc_data(
 
 
 # ---------------------------------------------------------
-# Station discovery (internal; use swift.wris.stations / swift.cwc.stations)
+# Station discovery (internal; use hydroswift.wris.stations / hydroswift.cwc.stations)
 # ---------------------------------------------------------
 
 def _resolve_variable(var):
@@ -962,10 +962,10 @@ def cwc_stations(station=None, basin=None, river=None, state=None, refresh=False
 
     Examples
     --------
-    >>> swift.cwc.stations()
-    >>> swift.cwc.stations(station="032-LGDHYD")
-    >>> swift.cwc.stations(basin="godavari")
-    >>> swift.cwc.stations(basin=["Godavari", "Krishna"], state=["Telangana", "Andhra Pradesh"])
+    >>> hydroswift.cwc.stations()
+    >>> hydroswift.cwc.stations(station="032-LGDHYD")
+    >>> hydroswift.cwc.stations(basin="godavari")
+    >>> hydroswift.cwc.stations(basin=["Godavari", "Krishna"], state=["Telangana", "Andhra Pradesh"])
     """
     df = get_cwc_station_metadata(
         station=station,
@@ -1089,22 +1089,22 @@ class _WrisNamespace:
         """
         if state is not None and str(state).strip() != "":
             raise ValueError(
-                "state filtering is currently only supported for swift.cwc.stations(). "
+                "state filtering is currently only supported for hydroswift.cwc.stations(). "
                 "WRIS station discovery supports basin-level filtering only."
             )
         if variable is None:
             raise ValueError(
-                "variable is required for swift.wris.stations() "
+                "variable is required for hydroswift.wris.stations() "
                 "(for example: 'discharge' or 'solar')."
             )
         if isinstance(variable, str) and not variable.strip():
             raise ValueError(
-                "variable is required for swift.wris.stations() "
+                "variable is required for hydroswift.wris.stations() "
                 "(for example: 'discharge' or 'solar')."
             )
         if isinstance(variable, (list, tuple, set)) and not variable:
             raise ValueError(
-                "variable is required for swift.wris.stations() "
+                "variable is required for hydroswift.wris.stations() "
                 "(for example: 'discharge' or 'solar')."
             )
         return wris_stations(basin=basin, var=variable, delay=delay)
@@ -1161,7 +1161,7 @@ class _WrisNamespace:
         variable : str or list[str], optional
             When provided, expands the table to one row per
             ``(basin, variable)`` pair so it can be passed directly to
-            ``swift.fetch(...)`` for full-basin downloads.
+            ``hydroswift.fetch(...)`` for full-basin downloads.
         """
         base_records = [{"id": k, "basin": v} for k, v in WRIS_BASINS.items()]
 
@@ -1250,8 +1250,8 @@ class _CwcNamespace:
         - Basin filtering is supported for CWC downloads and is applied before download.
         - If both station and basin are provided, only stations present in both are downloaded.
         - If no stations match the basin filter, a ValueError is raised.
-        - Table-like inputs (for example from ``swift.cwc.stations()`` or
-          ``swift.cwc.basins()``) should be passed to ``swift.fetch(...)``.
+        - Table-like inputs (for example from ``hydroswift.cwc.stations()`` or
+          ``hydroswift.cwc.basins()``) should be passed to ``hydroswift.fetch(...)``.
         """
         if isinstance(station, pd.DataFrame) or isinstance(basin, pd.DataFrame):
             raise TypeError(
@@ -1390,9 +1390,9 @@ def fetch(
     Parameters
     ----------
         stations : pandas.DataFrame
-                HydroSwift table (typically from ``swift.wris.stations()``,
-                ``swift.cwc.stations()``, ``swift.wris.basins(variable=...)`` or
-                ``swift.cwc.basins()``).
+                HydroSwift table (typically from ``hydroswift.wris.stations()``,
+                ``hydroswift.cwc.stations()``, ``hydroswift.wris.basins(variable=...)`` or
+                ``hydroswift.cwc.basins()``).
 
                 - WRIS station tables include ``station_code`` and optionally
                     per-row ``basin``/``variable`` columns.
@@ -1426,8 +1426,8 @@ def fetch(
     if not isinstance(stations, pd.DataFrame):
         raise TypeError(
             "fetch() expects a pandas DataFrame/SwiftTable from "
-            "swift.wris.stations(...), swift.cwc.stations(...), "
-            "swift.wris.basins(...), or swift.cwc.basins(...)."
+            "hydroswift.wris.stations(...), hydroswift.cwc.stations(...), "
+            "hydroswift.wris.basins(...), or hydroswift.cwc.basins(...)."
         )
 
     source = stations.attrs.get("source") or stations.attrs.get("fetch_source")
@@ -1618,7 +1618,7 @@ def fetch(
         if basin is None or variable is None:
             raise ValueError(
                 "WRIS station table is missing 'basin'/'variable' columns or attrs. "
-                "Build it using swift.wris.stations(basin=..., variable=...)."
+                "Build it using hydroswift.wris.stations(basin=..., variable=...)."
             )
         station_codes = sorted(
             {
@@ -1650,7 +1650,7 @@ def fetch(
         has_basin_col = "basin" in stations.columns
         has_state_col = "state" in stations.columns
 
-        # Basin-level CWC fetch from swift.cwc.basins(): table includes
+        # Basin-level CWC fetch from hydroswift.cwc.basins(): table includes
         # basin names and station counts, but no explicit station codes.
         if has_basin_col and not has_code_col:
             basin_df = stations[["basin"]].dropna().copy()
@@ -1659,7 +1659,7 @@ def fetch(
             if basin_df.empty:
                 raise ValueError(
                     "CWC basin table has no valid basin values. "
-                    "Use swift.cwc.basins() or provide a non-empty 'basin' column."
+                    "Use hydroswift.cwc.basins() or provide a non-empty 'basin' column."
                 )
 
             unique_basins = _unique_preserve_order(basin_df["basin"].tolist())
@@ -1858,7 +1858,7 @@ def merge_only(
     )
     if mode == "cwc" and _var_list:
         warnings.warn(
-            "swift.merge_only(mode='cwc', ...) ignores variable; CWC data only has water levels.",
+            "hydroswift.merge_only(mode='cwc', ...) ignores variable; CWC data only has water levels.",
             UserWarning,
             stacklevel=2,
         )
@@ -2075,7 +2075,7 @@ def plot_only(
     )
     if (mode == "cwc" or cwc) and _var_list:
         warnings.warn(
-            "swift.plot_only(mode='cwc', ...) ignores variable; CWC data only has water levels.",
+            "hydroswift.plot_only(mode='cwc', ...) ignores variable; CWC data only has water levels.",
             UserWarning,
             stacklevel=2,
         )
