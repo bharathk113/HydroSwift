@@ -4,8 +4,8 @@ HydroSwift example notebooks are in the repository root rather than inside `docs
 
 ## Included examples
 
-[Python examples](hydroswift_python_examples.ipynb)
-[CLI Examples](hydroswift_cli_examples.ipynb)
+[Python examples](docs/examples/hydroswift_python_examples.ipynb)
+[CLI Examples](docs/examples/hydroswift_cli_examples.ipynb)
 
 
 ## Also..

@@ -223,13 +223,13 @@ HydroSwift retrieves publicly available data from:
 
 ------------------------------------------------------------
 
-CITATION
+<!-- CITATION
 
 If you use HydroSwift in your research, please cite:
 
 Sarat, C., Dash, D., & Kumar, A. (2026).
 HydroSwift: Automated Retrieval of Hydrological Station Data from India‑WRIS and CWC Portals.
-Journal of Open Source Software.
+Journal of Open Source Software. -->
 
 ------------------------------------------------------------
 
