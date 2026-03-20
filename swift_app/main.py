@@ -61,6 +61,15 @@ def main() -> int:
     from .cwc import run_cwc_download
     from .merge import merge_dataset_folder
 
+    raw_argv = sys.argv[1:]
+    banner_already_printed = False
+
+    # Ensure branding is visible for top-level informational CLI calls that
+    # may exit inside argparse before runtime logic is reached.
+    if len(raw_argv) == 0 or any(flag in raw_argv for flag in ("-h", "--help", "--version", "--cite")):
+        print_wish_banner()
+        banner_already_printed = True
+
     parser = build_parser()
     args = parser.parse_args()
     args.interface = "cli"
@@ -93,8 +102,9 @@ def main() -> int:
     if args.coffee:
         args.quiet = True
 
-    # Show banner only for CLI execution
-    if not args.quiet and __name__ == "__main__":
+    # Show banner for normal CLI runs unless quiet mode is enabled,
+    # and avoid duplicate output if it was already shown for meta commands.
+    if not args.quiet and not banner_already_printed:
         print_wish_banner()
 
     # ---------------------------------------------------------

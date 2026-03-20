@@ -84,3 +84,59 @@ def test_cli_parser_plot_quality_flags():
 
     assert args.plot_svg is True
     assert args.plot_moving_average_window == 30
+
+
+def test_main_shows_banner_for_help_flag(monkeypatch, capsys):
+    import swift_app.main as main_mod
+
+    monkeypatch.setattr("sys.argv", ["hyswift", "--help"])
+
+    try:
+        main_mod.main()
+    except SystemExit as exc:
+        assert exc.code == 0
+
+    out = capsys.readouterr().out
+    assert "HYDROSWIFT" in out
+    assert "usage:" in out
+
+
+def test_main_shows_banner_for_version_flag(monkeypatch, capsys):
+    import swift_app.main as main_mod
+
+    monkeypatch.setattr("sys.argv", ["hyswift", "--version"])
+
+    try:
+        main_mod.main()
+    except SystemExit as exc:
+        assert exc.code == 0
+
+    out = capsys.readouterr().out
+    assert "HYDROSWIFT" in out
+    assert "HydroSwift" in out
+
+
+def test_main_shows_banner_for_empty_invocation(monkeypatch, capsys):
+    import swift_app.main as main_mod
+
+    monkeypatch.setattr("sys.argv", ["hyswift"])
+
+    rc = main_mod.main()
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "HYDROSWIFT" in out
+    assert "usage:" in out
+
+
+def test_main_shows_banner_for_cite_flag(monkeypatch, capsys):
+    import swift_app.main as main_mod
+
+    monkeypatch.setattr("sys.argv", ["hyswift", "--cite"])
+
+    rc = main_mod.main()
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "HYDROSWIFT" in out
+    assert "If you use HydroSwift in your research" in out

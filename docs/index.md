@@ -11,8 +11,8 @@ HydroSwift currently downloads hydrology data from two sources:
 
 This documentation has been rewritten to match the current codebase and the example workflows shown in:
 
-- `PYTHON_API_EXAMPLES.ipynb` / `PYTHON_API_EXAMPLES.html`
-- `SWIFT_CLI_BEGINNER.ipynb` / `SWIFT_CLI_BEGINNER.html`
+- `hydroswift_python_examples.ipynb` / `hydroswift_python_examples.html`
+- `hydroswift_cli_examples.ipynb` / `hydroswift_cli_examples.html`
 
 ## How HydroSwift is organized
 

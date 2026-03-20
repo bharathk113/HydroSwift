@@ -7,15 +7,12 @@ Allows execution without installation:
 """
 
 from swift_app import APP_NAME, APP_ORG, __version__, __codename__
-from swift_app.banner import print_wish_banner
 from swift_app.main import main
 
 
 if __name__ == "__main__":
 
     try:
-
-        print_wish_banner()
 
         raise SystemExit(main())
 

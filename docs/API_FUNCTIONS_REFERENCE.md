@@ -173,20 +173,3 @@ Prints citation information.
 Prints the coffee-break banner.
 
 ---
-
-## Legacy removals and migration notes
-
-These legacy names are intentionally removed:
-
-- `hydroswift.datasets`
-- `hydroswift.basins()`
-- `hydroswift.merge()`
-- `hydroswift.plot()`
-
-Use instead:
-
-- `hydroswift.wris.variables()`
-- `hydroswift.wris.basins()`
-- `hydroswift.cwc.basins()`
-- `hydroswift.merge_only()`
-- `hydroswift.plot_only()`

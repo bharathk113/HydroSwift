@@ -49,13 +49,18 @@ INSTALLATION
 
 From source:
 
-    git clone https://github.com/carbform/hydroswift.git
+    git clone https://github.com/carbform/HydroSwift.git
     cd swift
-    pip install -e .
+    python -m pip install --upgrade pip
+    python -m pip install -e .
 
-Using pip (future release):
+To install optional plotting and geospatial extras:
 
-    pip install hydroswift
+    python -m pip install -e .[all]
+
+Alternatively, a convenience installer is included at `scripts/install_hyswift_cli.sh`.
+
+    bash scripts/install_hyswift_cli.sh
 
 ------------------------------------------------------------
 ## Quick Test
@@ -71,8 +76,8 @@ This should display the HydroSwift command-line interface (`hyswift`) and availa
 
 - Python API guide: `docs/PYTHON_API_GUIDE.md`
 - CLI usage guide: `docs/CLI_USAGE_GUIDE.md`
-- CLI examples notebook: `SWIFT_CLI_BEGINNER.ipynb` / `SWIFT_CLI_BEGINNER.html`
-- Python API examples notebook: `PYTHON_API_EXAMPLES.ipynb` / `PYTHON_API_EXAMPLES.html`
+- CLI examples notebook: `hydroswift_cli_examples.ipynb`
+- Python API examples notebook: `hydroswift_python_examples.ipynb`
 - API reference table: `docs/API_FUNCTIONS_REFERENCE.md`
 - Web docs build config: `mkdocs.yml` + `.readthedocs.yaml`
 

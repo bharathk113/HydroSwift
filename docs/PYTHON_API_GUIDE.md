@@ -6,7 +6,7 @@ This guide documents the current Python API exposed by:
 import hydroswift
 ```
 
-It reflects the implementation in `hydroswift.api` and the workflows demonstrated in `PYTHON_API_EXAMPLES.ipynb`.
+It reflects the implementation in `hydroswift.api` and the workflows demonstrated in `hydroswift_python_examples.ipynb`.
 
 ## 1. Core API model
 

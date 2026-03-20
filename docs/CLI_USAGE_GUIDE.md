@@ -14,9 +14,7 @@ or, if the console script is not on your path:
 python -m hydroswift ...
 ```
 
-This guide reflects the current parser in `hydroswift.cli` and the examples shown in `SWIFT_CLI_BEGINNER.ipynb`.
-
-## 1. Important mental model
+## 1. Important!
 
 The CLI is **flag-based**, not subcommand-based.
 
@@ -162,7 +160,7 @@ Use existing downloaded files to generate GeoPackages.
 hyswift --merge-only --input-dir output
 ```
 
-You may also control the output location:
+You can also specify the output folder
 
 ```bash
 hyswift --merge-only --input-dir output --output-dir merged_output
@@ -241,6 +239,6 @@ These modes require:
 
 CWC is a water-level workflow. If you need multiple WRIS variables, use WRIS mode with `-b` plus WRIS dataset flags.
 
-### Want table-driven workflows from the terminal
+### Want table-driven workflows from the terminal?
 
 The CLI does not expose the same table-native dispatch model as `hydroswift.fetch(...)`. For discover → subset → fetch workflows, prefer the Python API.
