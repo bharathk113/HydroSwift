@@ -24,8 +24,8 @@ This page connects the current Python API, the CLI, and the example notebooks.
 
 The repository currently includes two example notebook pairs:
 
-- `hydroswift_python_examples.ipynb` / `hydroswift_python_examples.html`
-- `hydroswift_cli_examples.ipynb` / `hydroswift_cli_examples.html`
+- `PYTHON_API_EXAMPLES.ipynb` / `PYTHON_API_EXAMPLES.html`
+- `SWIFT_CLI_BEGINNER.ipynb` / `SWIFT_CLI_BEGINNER.html`
 
 The Python notebook emphasizes:
 
@@ -69,7 +69,7 @@ The CLI notebook emphasizes:
 
 ---
 
-## 4. Key conceptual differences
+## 4. Differences in Python API vs CLI
 
 ### Python API supports table-native workflows
 
@@ -83,7 +83,7 @@ result = hydroswift.fetch(subset, merge=True)
 
 That pattern does not have an equivalent CLI table object.
 
-### CLI is optimized for direct commands
+### CLI is optimised for direct commands
 
 The CLI is best when you already know:
 
